@@ -316,7 +316,7 @@ io.on('connection', (socket) => {
 });
 
 // All remaining requests return the Angular app, so it can handle routing.
-app.get('*', (req, res) => {
+app.get('/*', (req, res) => {
     res.sendFile(path.join(__dirname, '../dist/prova/browser/index.html'));
 });
 
