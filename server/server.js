@@ -6,8 +6,7 @@ const path = require('path');
 const app = express();
 const server = http.createServer(app);
 
-// Serve static files from the Angular app
-../dist/app/browser
+app.use(express.static(path.join(__dirname, '../dist/app/browser')));
 
 const io = socketIo(server, {
     cors: {
