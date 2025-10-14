@@ -1,9 +1,14 @@
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
+
+// Serve static files from the Angular app
+app.use(express.static(path.join(__dirname, '../dist/prova/browser')));
+
 const io = socketIo(server, {
     cors: {
         origin: "*", // Allow all origins for development. Restrict in production.
@@ -310,5 +315,10 @@ io.on('connection', (socket) => {
     });
 });
 
-const PORT = process.env.PORT || 3001;
+// All remaining requests return the Angular app, so it can handle routing.
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../dist/prova/browser/index.html'));
+});
+
+const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));

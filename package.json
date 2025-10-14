@@ -3,11 +3,12 @@
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
-    "start": "ng serve",
+    "start": "node server/server.js",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "serve:ssr:prova": "node dist/prova/server/server.mjs"
+    "serve:ssr:prova": "node dist/prova/server/server.mjs",
+    "heroku-postbuild": "ng build --configuration=production"
   },
   "prettier": {
     "printWidth": 100,
@@ -34,6 +35,7 @@
     "@angular/ssr": "^20.3.4",
     "express": "^5.1.0",
     "rxjs": "~7.8.0",
+    "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
     "tslib": "^2.3.0",
     "zone.js": "^0.15.1"
