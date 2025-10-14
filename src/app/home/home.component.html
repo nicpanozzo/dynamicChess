@@ -1,0 +1,53 @@
+<div class="home-container">
+  <h1>Dynamic Chess</h1>
+  <p>A new way to play chess.</p>
+
+  <div class="game-setup">
+    <div class="input-group">
+      <label for="username">Username:</label>
+      <input id="username" type="text" [(ngModel)]="username" placeholder="Enter your username">
+    </div>
+
+    <div class="cooldown-settings">
+      <h2>Cooldown Settings (ms)</h2>
+      <div class="cooldown-grid">
+        <div class="input-group">
+          <label for="pawnCooldown">Pawn:</label>
+          <input id="pawnCooldown" type="number" [(ngModel)]="pawnCooldown">
+        </div>
+        <div class="input-group">
+          <label for="knightCooldown">Knight:</label>
+          <input id="knightCooldown" type="number" [(ngModel)]="knightCooldown">
+        </div>
+        <div class="input-group">
+          <label for="bishopCooldown">Bishop:</label>
+          <input id="bishopCooldown" type="number" [(ngModel)]="bishopCooldown">
+        </div>
+        <div class="input-group">
+          <label for="rookCooldown">Rook:</label>
+          <input id="rookCooldown" type="number" [(ngModel)]="rookCooldown">
+        </div>
+        <div class="input-group">
+          <label for="queenCooldown">Queen:</label>
+          <input id="queenCooldown" type="number" [(ngModel)]="queenCooldown">
+        </div>
+        <div class="input-group">
+          <label for="kingCooldown">King:</label>
+          <input id="kingCooldown" type="number" [(ngModel)]="kingCooldown">
+        </div>
+      </div>
+    </div>
+
+    <div class="action-buttons">
+      <button (click)="createRoom()">Create Room</button>
+      <div class="join-room-group">
+        <input type="text" [(ngModel)]="roomCode" placeholder="Enter Room Code">
+        <button (click)="joinRoom()">Join Room</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="navigation-buttons">
+    <a routerLink="/rules">Rules</a>
+  </div>
+</div>

@@ -1,0 +1,171 @@
+import { Component, OnInit, OnDestroy, NgZone } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
+import { SocketService } from '../socket.service';
+import { LobbyService } from '../lobby.service'; // Import LobbyService
+import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { Subscription } from 'rxjs';
+
+@Component({
+  selector: 'app-lobby',
+  standalone: true,
+  imports: [CommonModule, FormsModule],
+  templateUrl: './lobby.component.html',
+  styleUrls: ['./lobby.component.css']
+})
+export class LobbyComponent implements OnInit, OnDestroy {
+  lobby: any = null;
+  roomCode: string = '';
+  myPlayerId: string | undefined = '';
+  private subscriptions = new Subscription();
+
+  constructor(
+    private route: ActivatedRoute,
+    private router: Router,
+    private socketService: SocketService,
+    private zone: NgZone,
+    private lobbyService: LobbyService // Inject LobbyService
+  ) {
+    this.myPlayerId = this.socketService.id;
+    // Read the initial state directly from the service
+    this.lobby = this.lobbyService.lobbyState;
+  }
+
+  ngOnInit() {
+    this.roomCode = this.route.snapshot.paramMap.get('roomCode')!;
+
+    // If we didn't get the state from the service (e.g., direct navigation), fetch it.
+    if (!this.lobby) {
+      this.socketService.emit('joinLobby', { roomCode: this.roomCode });
+    }
+
+    this.subscriptions.add(
+      this.socketService.listen('lobbyState').subscribe((lobbyState: any) => {
+        this.zone.run(() => {
+          this.lobby = lobbyState;
+        });
+      })
+    );
+
+    this.subscriptions.add(
+      this.socketService.listen('gameStarted').subscribe((gameState: any) => {
+        this.zone.run(() => {
+          this.router.navigate(['/game'], { 
+            queryParams: { 
+              room: gameState.roomCode, 
+              color: this.getMyPlayer()?.color, 
+              customCooldowns: JSON.stringify(gameState.customCooldowns) 
+            },
+            state: { board: gameState.board, players: gameState.players } 
+          });
+        });
+      })
+    );
+
+    this.subscriptions.add(
+      this.socketService.listen('teamError').subscribe((message: string) => {
+        alert(message);
+      })
+    );
+
+    this.subscriptions.add(
+      this.socketService.listen('startError').subscribe((message: string) => {
+        alert(message);
+      })
+    );
+
+    this.subscriptions.add(
+      this.socketService.listen('roomCancelled').subscribe(() => {
+        alert('The room owner has cancelled the room.');
+        this.zone.run(() => {
+          this.router.navigate(['/']);
+        });
+      })
+    );
+  }
+
+  ngOnDestroy() {
+    this.socketService.emit('leaveLobby', { roomCode: this.roomCode });
+    this.subscriptions.unsubscribe();
+  }
+
+  getMyPlayer() {
+    return this.lobby?.players.find((p: any) => p.id === this.myPlayerId);
+  }
+
+  getTeam(team: string) {
+    return this.lobby?.players.filter((p: any) => p.color === team);
+  }
+
+  isOwner() {
+    return this.lobby?.roomOwnerId === this.myPlayerId;
+  }
+
+  isSpectator() {
+      const myPlayer = this.getMyPlayer();
+      return myPlayer && myPlayer.color === 'spectator';
+  }
+
+  isTeamTaken(team: 'white' | 'black') {
+    const teamPlayer = this.lobby?.players.find((p: any) => p.color === team);
+    return teamPlayer && teamPlayer.id !== this.myPlayerId;
+  }
+
+  isPlayerReady() {
+    const myPlayer = this.getMyPlayer();
+    return myPlayer ? myPlayer.isReady : false;
+  }
+
+  canStartGame() {
+    if (!this.lobby) return false;
+    const whitePlayer = this.lobby.players.find((p: any) => p.color === 'white');
+    const blackPlayer = this.lobby.players.find((p: any) => p.color === 'black');
+    if (!whitePlayer || !blackPlayer) return false;
+
+    const allPlayersReady = this.lobby.players
+      .filter((p: any) => p.color !== 'spectator')
+      .every((p: any) => p.isReady);
+    return allPlayersReady;
+  }
+
+  changeTeam(team: 'white' | 'black' | 'spectator') {
+    this.socketService.emit('changeTeam', { roomCode: this.roomCode, team });
+  }
+
+  toggleReady() {
+    const myPlayer = this.getMyPlayer();
+    if (myPlayer && myPlayer.color !== 'spectator') {
+      this.socketService.emit('setReady', { roomCode: this.roomCode, isReady: !myPlayer.isReady });
+    }
+  }
+
+  updateSettings() {
+    if (this.isOwner()) {
+      this.socketService.emit('updateSettings', { roomCode: this.roomCode, customCooldowns: this.lobby.customCooldowns });
+    }
+  }
+
+  startGame() {
+    this.socketService.emit('startGame', { roomCode: this.roomCode });
+  }
+
+  copyInviteLink() {
+    const inviteLink = `${window.location.origin}/lobby/${this.roomCode}`;
+    navigator.clipboard.writeText(inviteLink).then(() => {
+      alert('Invite link copied to clipboard!');
+    }, (err) => {
+      console.error('Could not copy text: ', err);
+    });
+  }
+
+  leaveLobby() {
+    if (this.isOwner()) {
+        if (confirm('As the owner, leaving the lobby will cancel the room for everyone. Are you sure?')) {
+            this.socketService.emit('cancelRoom', { roomCode: this.roomCode });
+            this.router.navigate(['/']);
+        }
+    } else {
+        this.router.navigate(['/']);
+    }
+  }
+}

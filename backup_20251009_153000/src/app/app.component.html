@@ -1,0 +1,23 @@
+<header>
+  <h1>{{ title }}</h1>
+  <nav>
+    <a routerLink="/">Home</a>
+    <a routerLink="/game">Game</a>
+    <a routerLink="/rules">Rules</a>
+  </nav>
+</header>
+
+<div *ngIf="isInLobby" class="lobby-container">
+  <h2>Join or Create a Game</h2>
+  <div class="lobby-form">
+    <input type="text" [(ngModel)]="username" placeholder="Enter your username" />
+    <button (click)="createRoom()">Create Room</button>
+  </div>
+  <div class="lobby-form">
+    <input type="text" [(ngModel)]="roomCode" placeholder="Enter room code" />
+    <button (click)="joinRoom()">Join Room</button>
+  </div>
+  <p *ngIf="joinError" class="error-message">{{ joinError }}</p>
+</div>
+
+<router-outlet *ngIf="!isInLobby" />

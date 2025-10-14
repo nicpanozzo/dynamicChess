@@ -1,0 +1,148 @@
+.chessboard-container {
+  transition: transform 0.5s ease-in-out;
+}
+
+.chessboard-container.rotated {
+  transform: rotate(180deg);
+}
+
+.chessboard-container.rotated .board-cell {
+  transform: rotate(180deg);
+}
+
+.chessboard {
+  display: grid;
+  grid-template-columns: repeat(8, 60px); /* Increased size for better visibility */
+  grid-template-rows: repeat(8, 60px);    /* Increased size for better visibility */
+  width: 480px; /* 8 * 60px */
+  height: 480px; /* 8 * 60px */
+  border: 4px solid #4a2c2a; /* Darker, richer border */
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.5); /* Added shadow for depth */
+}
+
+.board-row {
+  display: contents;
+}
+
+.board-cell {
+  width: 60px;
+  height: 60px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 40px; /* Larger pieces */
+  position: relative;
+  cursor: pointer; /* Indicate interactivity */
+  transition: background-color 0.2s ease-in-out; /* Smooth transition for hover/selection */
+}
+
+.light-bg {
+  background-color: #f0d2b5; /* Warmer light square color */
+}
+
+.dark-bg {
+  background-color: #b88b6a; /* Richer dark square color */
+}
+
+.piece {
+  font-family: "Segoe UI Symbol", "Noto Color Emoji", sans-serif; /* Ensure good rendering of Unicode */
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5); /* Stronger shadow for pieces */
+}
+
+.white-piece {
+  color: #ffffff; /* White color for white pieces */
+}
+
+.black-piece {
+  color: #000000; /* Black color for black pieces */
+}
+
+.dark-bg .piece {
+  /* This rule is now redundant as colors are set by .white-piece and .black-piece */
+  /* color: #eee; */
+}
+
+.selected {
+  background-color: #ffeb3b; /* Vibrant yellow for selected */
+  box-shadow: inset 0 0 0 3px #ffc107; /* Inner shadow for selection */
+}
+
+.reached {
+  background-color: #8bc34a; /* Green for reached */
+}
+
+.landing {
+  background-color: lightblue; /* Blue for landing */
+  box-shadow: inset 0 0 0 3px #1976d2; /* Inner shadow for landing */
+}
+
+.illegal-landing {
+  background-color: #ff8c00; /* Orange for illegal landing */
+  box-shadow: inset 0 0 0 3px #cc7000; /* Darker orange inner shadow */
+}
+
+.cooldown-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.7), rgba(128, 128, 128, 0.7)); /* Dark gray to light gray gradient with transparency */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  /* color: white; Removed as text-fill-color will make it transparent */
+  /* font-size: 1.5em; Removed as font-size is now on .cooldown-text */
+  /* text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.7); Removed as it's not needed with transparent text */
+  border-radius: 5px; /* Slightly rounded corners */
+  z-index: 10; /* Ensure it's on top */
+  transition: opacity 0.3s ease-in-out; /* Smooth transition for opacity */
+}
+
+.cooldown-text {
+  color: #cccccc; /* Light gray color for visibility */
+  font-weight: bold; /* Bold */
+  font-size: 1.5em; /* Smaller font size */
+  letter-spacing: 2px; /* Wide effect */
+}
+
+/* General layout styles - kept for context, but might need review for overall app */
+.container {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 20px;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-left: 30px;
+  padding: 15px;
+  background-color: #f5f5f5;
+  border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.vertical-bar-container {
+  width: 25px;
+  height: 120px;
+  border: 1px solid #ccc;
+  margin-bottom: 15px;
+  background-color: #e0e0e0;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.vertical-bar {
+  width: 100%;
+  background-color: #4caf50; /* Green bar */
+  transition: height 0.3s ease-out;
+}
+
+.direction-icon {
+  font-size: 35px;
+  color: #555;
+  margin-top: 10px;
+}

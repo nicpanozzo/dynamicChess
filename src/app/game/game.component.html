@@ -1,0 +1,33 @@
+<div class="game-container">
+  <div class="game-info">
+    <p *ngIf="roomCode">Room Code: <b>{{ roomCode }}</b></p>
+    <p *ngIf="playerColor">You are: <b [style.color]="playerColor === 'white' ? 'white' : 'black'">{{ playerColor }}</b></p>
+    <p>Opponent: <b>{{ opponentUsername }}</b></p>
+    <p>Your Record: {{ playerWins }} W - {{ playerLosses }} L</p>
+    <div *ngIf="isGameOver" class="game-over-message">
+      <h2>Game Over!</h2>
+      <p>Winner: <b [style.color]="winner === 'white' ? 'white' : 'black'">{{ winner?.toUpperCase() }}</b></p>
+    </div>
+  </div>
+  <app-chessboard></app-chessboard>
+  <div class="game-controls">
+    <button *ngIf="!isGameOver" (click)="resign()">Resign</button>
+    <div *ngIf="isGameOver" class="game-end-actions">
+      <button (click)="backToHome()">Back to Home</button>
+      <button *ngIf="!rematchOffered && !rematchRequested" (click)="proposeRematch()">Propose Rematch</button>
+      <p *ngIf="rematchOffered">Rematch offered!</p>
+      <div *ngIf="rematchRequested">
+        <p>Opponent wants a rematch!</p>
+        <button (click)="acceptRematch()">Accept</button>
+        <button (click)="declineRematch()">Decline</button>
+      </div>
+    </div>
+    <div class="commands-recap">
+      <h3>Commands</h3>
+      <p><b>p, r, n, b, q, k:</b> Select piece type</p>
+      <p><b>Shift + key:</b> Select all pieces of a type</p>
+      <p><b>Numpad 1-9:</b> Move piece</p>
+      <p><b>5:</b> Cancel move (half cooldown)</p>
+    </div>
+  </div>
+</div>

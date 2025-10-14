@@ -1,0 +1,132 @@
+.home-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh; /* Use min-height to allow content to expand */
+  text-align: center;
+  background-color: #f0f2f5; /* Light background for the page */
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+h1 {
+  color: #333;
+  margin-bottom: 10px;
+}
+
+p {
+  color: #666;
+  margin-bottom: 30px;
+}
+
+.game-setup {
+  background-color: #ffffff;
+  padding: 30px;
+  border-radius: 10px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 600px; /* Limit width for better readability */
+  margin-bottom: 30px;
+}
+
+.input-group {
+  margin-bottom: 15px;
+  text-align: left;
+}
+
+.input-group label {
+  display: block;
+  margin-bottom: 5px;
+  color: #555;
+  font-weight: bold;
+}
+
+.input-group input[type="text"],
+.input-group input[type="number"] {
+  width: calc(100% - 20px); /* Account for padding */
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  font-size: 1em;
+}
+
+.cooldown-settings {
+  margin-top: 20px;
+  margin-bottom: 20px;
+  padding: 20px;
+  background-color: #f9f9f9;
+  border: 1px solid #eee;
+  border-radius: 8px;
+}
+
+.cooldown-settings h2 {
+  font-size: 1.2em;
+  color: #444;
+  margin-bottom: 15px;
+}
+
+.cooldown-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); /* Responsive grid */
+  gap: 15px;
+}
+
+.action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.action-buttons button {
+  padding: 12px 25px;
+  border: none;
+  border-radius: 5px;
+  font-size: 1.1em;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  color: white;
+  background-color: #007bff; /* Primary blue */
+}
+
+.action-buttons button:hover {
+  background-color: #0056b3;
+}
+
+.join-room-group {
+  display: flex;
+  gap: 10px;
+}
+
+.join-room-group input {
+  flex-grow: 1;
+}
+
+.join-room-group button {
+  flex-shrink: 0;
+  background-color: #28a745; /* Success green */
+}
+
+.join-room-group button:hover {
+  background-color: #218838;
+}
+
+.navigation-buttons {
+  margin-top: 20px;
+}
+
+.navigation-buttons a {
+  margin: 0 10px;
+  padding: 10px 20px;
+  border: 1px solid #007bff;
+  border-radius: 5px;
+  text-decoration: none;
+  color: #007bff;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.navigation-buttons a:hover {
+  background-color: #007bff;
+  color: white;
+}
