@@ -7,14 +7,13 @@ import { Observable } from 'rxjs';
 })
 export class SocketService {
   private socket: Socket;
-  private readonly uri: string = 'http://192.168.17.107:3001'; // Backend server URL
 
   public get id(): string | undefined {
     return this.socket.id;
   }
 
   constructor() {
-    this.socket = io(this.uri);
+    this.socket = io();
   }
 
   // Listen for events from the server
