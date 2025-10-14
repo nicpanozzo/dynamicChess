@@ -7,7 +7,7 @@ const app = express();
 const server = http.createServer(app);
 
 // Serve static files from the Angular app
-app.use(express.static(path.join(__dirname, '../dist/prova/browser')));
+../dist/app/browser
 
 const io = socketIo(server, {
     cors: {
@@ -317,7 +317,7 @@ io.on('connection', (socket) => {
 
 // All remaining requests return the Angular app, so it can handle routing.
 app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, '../dist/prova/browser/index.html'));
+    res.sendFile(path.join(__dirname, '../dist/app/browser/index.html'));
 });
 
 const PORT = process.env.PORT || 3000;
