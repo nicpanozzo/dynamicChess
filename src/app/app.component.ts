@@ -1,7 +1,8 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink, RouterOutlet } from '@angular/router';
+import { SocketService } from './socket.service';
 
 @Component({
   selector: 'app-root',
@@ -10,6 +11,16 @@ import { RouterLink, RouterOutlet } from '@angular/router';
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.css']
 })
-export class AppComponent {
+export class AppComponent implements OnInit {
   title = 'Dynamic Chess';
+
+  constructor(private socketService: SocketService) {}
+
+  ngOnInit() {
+    this.socketService.connect();
+  }
+
+  requestDebugState() {
+    this.socketService.emit('debugState', {});
+  }
 }

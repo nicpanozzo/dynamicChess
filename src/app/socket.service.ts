@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, isDevMode } from '@angular/core';
 import { io, Socket } from 'socket.io-client';
 import { Observable } from 'rxjs';
 
@@ -6,21 +6,25 @@ import { Observable } from 'rxjs';
   providedIn: 'root'
 })
 export class SocketService {
-  private socket: Socket;
+  private socket: Socket | undefined;
 
   public get id(): string | undefined {
-    return this.socket.id;
+    return this.socket?.id;
   }
 
-  constructor() {
-    this.socket = io();
+  constructor() { }
+
+  connect(): void {
+    if (!this.socket) {
+      const uri = isDevMode() ? 'http://localhost:3000' : '';
+      this.socket = io(uri);
+    }
   }
 
   // Listen for events from the server
   listen(eventName: string): Observable<any> {
-    console.log(`[SocketService] Listening for event: ${eventName}`);
     return new Observable((subscriber) => {
-      this.socket.on(eventName, (data: any) => {
+      this.socket?.on(eventName, (data: any) => {
         console.log(`[SocketService] Received event: ${eventName} with data:`, data);
         subscriber.next(data);
       });
@@ -29,12 +33,11 @@ export class SocketService {
 
   // Emit events to the server
   emit(eventName: string, data: any) {
-    console.log(`[SocketService] Emitting event: ${eventName} with data:`, data);
-    this.socket.emit(eventName, data);
+    this.socket?.emit(eventName, data);
   }
 
   // Disconnect from the server
   disconnect() {
-    this.socket.disconnect();
+    this.socket?.disconnect();
   }
 }

@@ -9,7 +9,7 @@ import { CommonModule } from '@angular/common';
   styleUrls: ['./chessboard.component.css']
 })
 export class ChessboardComponent implements OnDestroy {
-  @Input() playerColor: 'white' | 'black' | null = null;
+  @Input() playerColor: 'white' | 'black' | 'spectator' | null = null;
 
   private _customCooldowns: { [key: string]: number } | null = null;
 

@@ -1,4 +1,4 @@
-import { Component, OnInit, ViewChild, AfterViewInit } from '@angular/core';
+import { Component, OnInit, ViewChild, AfterViewInit, ChangeDetectorRef, NgZone } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { ChessboardComponent } from '../chessboard/chessboard.component';
@@ -15,12 +15,10 @@ export class GameComponent implements OnInit, AfterViewInit {
   @ViewChild(ChessboardComponent) chessboard!: ChessboardComponent;
 
   roomCode: string | null = null;
-  playerColor: 'white' | 'black' | null = null;
+  playerColor: 'white' | 'black' | 'spectator' | null = null;
   opponentUsername: string = 'Waiting for opponent...';
   isGameOver: boolean = false;
   winner: 'white' | 'black' | null = null;
-  rematchOffered: boolean = false;
-  rematchRequested: boolean = false;
   playerWins: number = 0;
   playerLosses: number = 0;
   customCooldowns: { [key: string]: number } | null = null;
@@ -31,7 +29,8 @@ export class GameComponent implements OnInit, AfterViewInit {
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private socketService: SocketService
+    private socketService: SocketService,
+    private zone: NgZone
   ) {
     const navigation = this.router.getCurrentNavigation();
     if (navigation?.extras.state) {
@@ -49,6 +48,11 @@ export class GameComponent implements OnInit, AfterViewInit {
       }
     });
 
+    // Ensure we are joined to the game room for events
+    if (this.roomCode) {
+      this.socketService.emit('joinGame', { roomCode: this.roomCode });
+    }
+
     if (this.initialPlayers) {
         const opponent = this.initialPlayers.find(p => p.color !== this.playerColor);
         if (opponent) {
@@ -58,60 +62,41 @@ export class GameComponent implements OnInit, AfterViewInit {
 
 
     this.socketService.listen('moveMade').subscribe((data: { move: any, board: string[][] }) => {
-      if (this.chessboard) {
-        this.chessboard.board = data.board;
-      }
+      console.log('[DEBUG] moveMade event received by client.', data);
+      this.zone.run(() => {
+        if (this.chessboard) {
+          this.chessboard.board = data.board;
+        }
+      });
     });
 
     this.socketService.listen('playerDisconnected').subscribe((data: { username: string }) => {
-      this.opponentUsername = `${data.username} disconnected.`;
-      if (!this.isGameOver) {
-        this.isGameOver = true;
-        this.winner = this.playerColor;
-        this.playerWins++;
-        alert(`${data.username} disconnected. You win!`);
-      }
+      this.zone.run(() => {
+        this.opponentUsername = `${data.username} disconnected.`;
+        // The server will send a 'gameOver' event to handle the game end state.
+      });
     });
 
     this.socketService.listen('gameOver').subscribe((data: { winner: 'white' | 'black', board: string[][], players: any[] }) => {
-      console.log('Game Over event received:', data);
-      this.isGameOver = true;
-      this.winner = data.winner;
-      if (this.chessboard) {
-        this.chessboard.board = data.board;
-      }
-      const myPlayer = data.players.find(p => p.color === this.playerColor);
-      if (myPlayer) {
-          this.playerWins = myPlayer.wins;
-          this.playerLosses = myPlayer.losses;
-      }
+      this.zone.run(() => {
+        console.log('Game Over event received:', data);
+        this.isGameOver = true;
+        this.winner = data.winner;
+        if (this.chessboard) {
+          this.chessboard.board = data.board;
+        }
+        const myPlayer = data.players.find(p => p.color === this.playerColor);
+        if (myPlayer) {
+            this.playerWins = myPlayer.wins;
+            this.playerLosses = myPlayer.losses;
+        }
+      });
     });
 
     this.socketService.listen('moveError').subscribe((message: string) => {
-      alert(`Move Error: ${message}`);
-    });
-
-    this.socketService.listen('rematchRequest').subscribe(() => {
-      console.log('Rematch request received!');
-      this.rematchRequested = true;
-    });
-
-    this.socketService.listen('rematchAccepted').subscribe((data: any) => {
-        this.resetGame(data.board, data.players);
-        // The server now swaps colors, so we just need to update our local color
-        const myNewPlayer = data.players.find((p:any) => p.id === this.socketService.id);
-        this.playerColor = myNewPlayer.color;
-
-        if (this.chessboard) {
-          this.chessboard.playerColor = this.playerColor;
-          this.chessboard.customCooldowns = data.customCooldowns;
-        }
-        alert('Rematch accepted! New game starting.');
-    });
-
-    this.socketService.listen('rematchDeclined').subscribe(() => {
-      this.rematchOffered = false;
-      alert('Rematch declined.');
+      this.zone.run(() => {
+        alert(`Move Error: ${message}`);
+      });
     });
   }
 
@@ -151,39 +136,13 @@ export class GameComponent implements OnInit, AfterViewInit {
     }
   }
 
-  backToHome() {
+  backToLobby() {
+    this.router.navigate(['/lobby', this.roomCode]);
+  }
+
+  leaveGameAndDisconnect() {
     this.socketService.disconnect();
     this.router.navigate(['/']);
   }
 
-  proposeRematch() {
-    this.socketService.emit('rematchRequest', { roomCode: this.roomCode, playerColor: this.playerColor });
-    this.rematchOffered = true;
-  }
-
-  acceptRematch() {
-    this.socketService.emit('rematchAccept', { roomCode: this.roomCode });
-    this.rematchRequested = false;
-  }
-
-  declineRematch() {
-    this.socketService.emit('rematchDecline', { roomCode: this.roomCode, playerColor: this.playerColor });
-    this.rematchRequested = false;
-  }
-
-  private resetGame(board: string[][], players: any[]) {
-    this.isGameOver = false;
-    this.winner = null;
-    this.rematchOffered = false;
-    this.rematchRequested = false;
-    if (this.chessboard) {
-      this.chessboard.board = board;
-      this.chessboard.initializeBoard();
-    }
-    const myPlayer = players.find(p => p.color === this.playerColor);
-    if (myPlayer) {
-        this.playerWins = myPlayer.wins;
-        this.playerLosses = myPlayer.losses;
-    }
-  }
 }

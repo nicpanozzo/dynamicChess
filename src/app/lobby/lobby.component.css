@@ -42,6 +42,11 @@
   font-weight: bold;
 }
 
+.player-card.disconnected {
+  opacity: 0.5;
+  font-style: italic;
+}
+
 .actions-container, .owner-actions, .footer-actions {
   margin-top: 20px;
   padding-top: 20px;

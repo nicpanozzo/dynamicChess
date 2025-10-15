@@ -64,10 +64,15 @@ function checkWinCondition(board) {
 io.on('connection', (socket) => {
     console.log('New client connected:', socket.id);
 
+    socket.on('debugState', () => {
+        console.log('[DEBUG] Server State Snapshot:');
+        console.log(JSON.stringify(rooms, null, 2));
+    });
+
     socket.on('createRoom', (data) => {
         const roomCode = generateUniqueRoomCode();
         rooms[roomCode] = {
-            players: [{ id: socket.id, username: data.username, color: 'white', isReady: false }],
+            players: [{ id: socket.id, username: data.username, color: 'white', isReady: false, wins: 0, losses: 0 }],
             customCooldowns: data.customCooldowns,
             roomOwnerId: socket.id,
             gameStarted: false,
@@ -83,35 +88,44 @@ io.on('connection', (socket) => {
     });
 
     socket.on('joinRoom', (data) => {
-        const room = rooms[data.roomCode];
+        const { username, roomCode } = data;
+        const room = rooms[roomCode];
         if (room) {
-            room.players.push({ id: socket.id, username: data.username, color: 'spectator', isReady: false });
-            socket.join(data.roomCode);
-            io.to(data.roomCode).emit('lobbyState', room);
-            console.log(`${data.username} joined room ${data.roomCode}`);
+            let player = room.players.find(p => p.username === username);
+            if (player) {
+                // Player is reconnecting, update their socket ID
+                player.id = socket.id;
+            } else {
+                // New player joining
+                room.players.push({ id: socket.id, username: username, color: 'spectator', isReady: false, wins: 0, losses: 0 });
+            }
+            socket.join(roomCode);
+            io.to(roomCode).emit('lobbyState', room);
+            console.log(`${username} joined room ${roomCode}`);
         } else {
             socket.emit('joinError', 'Room not found');
         }
     });
 
     socket.on('joinLobby', (data) => {
-        const { roomCode } = data;
+        const { roomCode, username } = data;
         const room = rooms[roomCode];
         if (room) {
             socket.join(roomCode);
-            socket.emit('lobbyState', room);
+            let player = room.players.find(p => p.username === username);
+            if (player) {
+                // Player is reconnecting, update their socket ID
+                player.id = socket.id;
+            }
+            // Broadcast to all in room to ensure sync
+            io.to(roomCode).emit('lobbyState', room);
         }
     });
 
-    socket.on('leaveLobby', (data) => {
+    socket.on('joinGame', (data) => {
         const { roomCode } = data;
-        const room = rooms[roomCode];
-        if (room) {
-            const playerIndex = room.players.findIndex(p => p.id === socket.id);
-            if (playerIndex !== -1) {
-                room.players.splice(playerIndex, 1);
-                io.to(roomCode).emit('lobbyState', room);
-            }
+        if (rooms[roomCode]) {
+            socket.join(roomCode);
         }
     });
 
@@ -121,17 +135,12 @@ io.on('connection', (socket) => {
         if (room) {
             const player = room.players.find(p => p.id === socket.id);
             if (player) {
-                const teamHasPlayer = room.players.some(p => p.color === team);
-                if (team !== 'spectator' && teamHasPlayer) {
-                    socket.emit('teamError', `Team ${team} is already taken.`);
-                    return;
-                }
                 player.color = team;
                 player.isReady = false;
                 io.to(roomCode).emit('lobbyState', room);
             }
         }
-    });
+    }); 
 
     socket.on('setReady', (data) => {
         const { roomCode, isReady } = data;
@@ -154,15 +163,32 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('swapTeams', (data) => {
+        const { roomCode } = data;
+        const room = rooms[roomCode];
+        // Only allow owner to swap teams
+        if (room && room.roomOwnerId === socket.id) {
+            room.players.forEach(player => {
+                if (player.color === 'white') {
+                    player.color = 'black';
+                } else if (player.color === 'black') {
+                    player.color = 'white';
+                }
+            });
+            // After swapping, emit the new state to everyone in the room
+            io.to(roomCode).emit('lobbyState', room);
+        }
+    });
+
     socket.on('startGame', (data) => {
         const { roomCode } = data;
         const room = rooms[roomCode];
         if (room && room.roomOwnerId === socket.id) {
-            const whitePlayer = room.players.find(p => p.color === 'white');
-            const blackPlayer = room.players.find(p => p.color === 'black');
+            const hasWhitePlayer = room.players.some(p => p.color === 'white');
+            const hasBlackPlayer = room.players.some(p => p.color === 'black');
 
-            if (!whitePlayer || !blackPlayer) {
-                socket.emit('startError', 'Both teams must have a player.');
+            if (!hasWhitePlayer || !hasBlackPlayer) {
+                socket.emit('startError', 'Both teams must have at least one player.');
                 return;
             }
 
@@ -202,7 +228,24 @@ io.on('connection', (socket) => {
 
         if (room && room.gameStarted && !room.winner) {
             const { startRow, startCol, endRow, endCol } = move;
+
+            // Validate move coordinates
+            if (
+                !Number.isInteger(startRow) || !Number.isInteger(startCol) ||
+                !Number.isInteger(endRow) || !Number.isInteger(endCol) ||
+                startRow < 0 || startRow > 7 || startCol < 0 || startCol > 7 ||
+                endRow < 0 || endRow > 7 || endCol < 0 || endCol > 7
+            ) {
+                socket.emit('moveError', 'Invalid move coordinates.');
+                return;
+            }
+
             const pieceToMove = room.board[startRow][startCol];
+
+            if (!pieceToMove) {
+                // This can happen with race conditions, it's not a critical error.
+                return;
+            }
 
             if ((playerColor === 'white' && pieceToMove === pieceToMove.toLowerCase()) ||
                 (playerColor === 'black' && pieceToMove === pieceToMove.toUpperCase())) {
@@ -217,12 +260,16 @@ io.on('connection', (socket) => {
 
             if (winner) {
                 room.winner = winner;
-                const winningPlayer = room.players.find(p => p.color === winner);
-                const losingPlayer = room.players.find(p => p.color !== winner && p.color !== 'spectator');
-                if (winningPlayer) winningPlayer.wins++;
-                if (losingPlayer) losingPlayer.losses++;
+                room.players.forEach(p => {
+                    if (p.color === winner) {
+                        p.wins = (p.wins || 0) + 1;
+                    } else if (p.color !== 'spectator') {
+                        p.losses = (p.losses || 0) + 1;
+                    }
+                });
 
-                io.to(roomCode).emit('gameOver', { winner, board: room.board, players: room.players });
+                const playersPayload = JSON.parse(JSON.stringify(rooms[roomCode].players));
+                io.to(roomCode).emit('gameOver', { winner, board: room.board, players: playersPayload });
             } else {
                 io.to(roomCode).emit('moveMade', { move, board: room.board });
             }
@@ -236,53 +283,16 @@ io.on('connection', (socket) => {
             const winnerColor = playerColor === 'white' ? 'black' : 'white';
             room.winner = winnerColor;
 
-            const resigningPlayer = room.players.find(p => p.color === playerColor);
-            const winningPlayer = room.players.find(p => p.color === winnerColor);
-            if (resigningPlayer) resigningPlayer.losses++;
-            if (winningPlayer) winningPlayer.wins++;
+            room.players.forEach(p => {
+                if (p.color === winnerColor) {
+                    p.wins = (p.wins || 0) + 1;
+                } else if (p.color === playerColor) {
+                    p.losses = (p.losses || 0) + 1;
+                }
+            });
 
-            io.to(roomCode).emit('gameOver', { winner: winnerColor, board: room.board, players: room.players });
-        }
-    });
-
-    socket.on('rematchRequest', (data) => {
-        const { roomCode, playerColor } = data;
-        const room = rooms[roomCode];
-        if (room) {
-            const opponent = room.players.find(p => p.color !== playerColor && p.color !== 'spectator');
-            if (opponent) {
-                io.to(opponent.id).emit('rematchRequest');
-            }
-        }
-    });
-
-    socket.on('rematchAccept', (data) => {
-        const { roomCode } = data;
-        const room = rooms[roomCode];
-        if (room) {
-            room.board = initialBoardState();
-            room.winner = null;
-            room.gameStarted = true;
-
-            const whitePlayer = room.players.find(p => p.color === 'white');
-            const blackPlayer = room.players.find(p => p.color === 'black');
-            if (whitePlayer) whitePlayer.color = 'black';
-            if (blackPlayer) blackPlayer.color = 'white';
-            
-            room.players.forEach(p => p.isReady = false);
-
-            io.to(roomCode).emit('rematchAccepted', room);
-        }
-    });
-
-    socket.on('rematchDecline', (data) => {
-        const { roomCode, playerColor } = data;
-        const room = rooms[roomCode];
-        if (room) {
-            const opponent = room.players.find(p => p.color !== playerColor && p.color !== 'spectator');
-            if (opponent) {
-                io.to(opponent.id).emit('rematchDeclined');
-            }
+            const playersPayload = JSON.parse(JSON.stringify(rooms[roomCode].players));
+            io.to(roomCode).emit('gameOver', { winner: winnerColor, board: room.board, players: playersPayload });
         }
     });
 
@@ -290,25 +300,36 @@ io.on('connection', (socket) => {
         console.log('Client disconnected:', socket.id);
         for (const roomCode in rooms) {
             const room = rooms[roomCode];
-            const playerIndex = room.players.findIndex(player => player.id === socket.id);
-            if (playerIndex !== -1) {
-                const disconnectedPlayer = room.players.splice(playerIndex, 1)[0];
-                if (room.players.length > 0) {
-                    if (room.gameStarted && !room.winner) {
-                        const remainingPlayer = room.players.find(p => p.color !== 'spectator');
-                        if (remainingPlayer) {
+            const player = room.players.find(p => p.id === socket.id);
+
+            if (player) {
+                // Mark player as disconnected by clearing their socket ID
+                player.id = null;
+                player.isReady = false;
+
+                // Check if the game should end due to disconnect
+                if (room.gameStarted && !room.winner) {
+                    const activePlayers = room.players.filter(p => p.id !== null && p.color !== 'spectator');
+                    if (activePlayers.length < 2) {
+                        const remainingPlayer = activePlayers[0];
+                        if(remainingPlayer) {
                             room.winner = remainingPlayer.color;
-                            remainingPlayer.wins++;
-                            io.to(roomCode).emit('gameOver', { winner: remainingPlayer.color, board: room.board, players: room.players });
+                            // Update win/loss for all players
+                            room.players.forEach(p => {
+                                if (p.color === room.winner) {
+                                    p.wins = (p.wins || 0) + 1;
+                                } else if (p.color !== 'spectator') {
+                                    p.losses = (p.losses || 0) + 1;
+                                }
+                            });
+                            io.to(roomCode).emit('gameOver', { winner: room.winner, board: room.board, players: room.players });
                         }
                     }
-                    io.to(roomCode).emit('lobbyState', room);
-                    io.to(roomCode).emit('playerDisconnected', { username: disconnectedPlayer.username });
-                } else {
-                    delete rooms[roomCode];
-                    console.log(`Room ${roomCode} deleted as last player disconnected.`);
                 }
-                break;
+
+                io.to(roomCode).emit('lobbyState', room);
+                io.to(roomCode).emit('playerDisconnected', { username: player.username });
+                break; // Exit loop once player is found and handled
             }
         }
     });

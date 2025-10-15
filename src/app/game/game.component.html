@@ -11,16 +11,10 @@
   </div>
   <app-chessboard></app-chessboard>
   <div class="game-controls">
-    <button *ngIf="!isGameOver" (click)="resign()">Resign</button>
+    <button *ngIf="!isGameOver && playerColor !== 'spectator'" (click)="resign()">Resign</button>
     <div *ngIf="isGameOver" class="game-end-actions">
-      <button (click)="backToHome()">Back to Home</button>
-      <button *ngIf="!rematchOffered && !rematchRequested" (click)="proposeRematch()">Propose Rematch</button>
-      <p *ngIf="rematchOffered">Rematch offered!</p>
-      <div *ngIf="rematchRequested">
-        <p>Opponent wants a rematch!</p>
-        <button (click)="acceptRematch()">Accept</button>
-        <button (click)="declineRematch()">Decline</button>
-      </div>
+      <button (click)="backToLobby()">Back to Lobby</button>
+      <button (click)="leaveGameAndDisconnect()">Leave Game</button>
     </div>
     <div class="commands-recap">
       <h3>Commands</h3>

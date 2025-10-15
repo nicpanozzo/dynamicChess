@@ -1,19 +1,22 @@
-import { Component, OnDestroy, NgZone } from '@angular/core';
+import { Component, OnDestroy, OnInit, NgZone } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { SocketService } from '../socket.service';
-import { LobbyService } from '../lobby.service'; // Import LobbyService
+import { LobbyService } from '../lobby.service';
+import { UserService } from '../user.service'; // Import UserService
 import { Subscription } from 'rxjs';
+import { CommonModule } from '@angular/common';
 
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [RouterLink, FormsModule],
+  imports: [RouterLink, FormsModule, CommonModule],
   templateUrl: './home.component.html',
   styleUrls: ['./home.component.css']
 })
-export class HomeComponent implements OnDestroy {
-  username: string = '';
+export class HomeComponent implements OnInit, OnDestroy {
+  savedUsername: string | null = null;
+  newUsername: string = '';
   roomCode: string = '';
   pawnCooldown: number = 2000;
   knightCooldown: number = 6000;
@@ -28,12 +31,16 @@ export class HomeComponent implements OnDestroy {
     private socketService: SocketService,
     private router: Router,
     private zone: NgZone,
-    private lobbyService: LobbyService // Inject LobbyService
-  ) {
+    private lobbyService: LobbyService,
+    private userService: UserService // Inject UserService
+  ) {}
+
+  ngOnInit() {
+    this.savedUsername = this.userService.getUsername();
+
     this.subscriptions.add(
       this.socketService.listen('lobbyState').subscribe((data: any) => {
         if (data && data.roomCode) {
-          // Set the state in the service before navigating
           this.lobbyService.lobbyState = data;
           this.zone.run(() => {
             this.router.navigate(['/lobby', data.roomCode]);
@@ -53,8 +60,20 @@ export class HomeComponent implements OnDestroy {
     this.subscriptions.unsubscribe();
   }
 
+  saveUsername() {
+    if (this.newUsername.trim()) {
+      this.userService.setUsername(this.newUsername.trim());
+      this.savedUsername = this.newUsername.trim();
+      this.newUsername = '';
+    }
+  }
+
+  changeUsername() {
+    this.savedUsername = null;
+  }
+
   createRoom() {
-    if (this.username) {
+    if (this.savedUsername) {
       const customCooldowns = {
         p: this.pawnCooldown,
         n: this.knightCooldown,
@@ -63,19 +82,17 @@ export class HomeComponent implements OnDestroy {
         q: this.queenCooldown,
         k: this.kingCooldown,
       };
-      // Corrected emit call with 2 arguments
-      this.socketService.emit('createRoom', { username: this.username, customCooldowns });
+      this.socketService.emit('createRoom', { username: this.savedUsername, customCooldowns });
     } else {
-      alert('Please enter a username.');
+      alert('Please set a username.');
     }
   }
 
   joinRoom() {
-    if (this.username && this.roomCode) {
-      // Corrected emit call with 2 arguments
-      this.socketService.emit('joinRoom', { username: this.username, roomCode: this.roomCode });
+    if (this.savedUsername && this.roomCode) {
+      this.socketService.emit('joinRoom', { username: this.savedUsername, roomCode: this.roomCode });
     } else {
-      alert('Please enter a username and room code.');
+      alert('Please set a username and enter a room code.');
     }
   }
 }

@@ -2,12 +2,22 @@
   <h1>Dynamic Chess</h1>
   <p>A new way to play chess.</p>
 
-  <div class="game-setup">
-    <div class="input-group">
-      <label for="username">Username:</label>
-      <input id="username" type="text" [(ngModel)]="username" placeholder="Enter your username">
+  <ng-container *ngIf="savedUsername; else usernamePrompt">
+    <div class="welcome-message">
+      <h2>Welcome back, {{ savedUsername }}!</h2>
+      <button (click)="changeUsername()">Change Username</button>
     </div>
+  </ng-container>
 
+  <ng-template #usernamePrompt>
+    <div class="input-group username-prompt">
+      <label for="newUsername">Choose a username to begin:</label>
+      <input id="newUsername" type="text" [(ngModel)]="newUsername" placeholder="Enter your username" (keyup.enter)="saveUsername()">
+      <button (click)="saveUsername()">Save</button>
+    </div>
+  </ng-template>
+
+  <div *ngIf="savedUsername" class="game-setup">
     <div class="cooldown-settings">
       <h2>Cooldown Settings (ms)</h2>
       <div class="cooldown-grid">
