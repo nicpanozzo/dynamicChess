@@ -106,11 +106,6 @@ export class LobbyComponent implements OnInit, OnDestroy {
       return myPlayer && myPlayer.color === 'spectator';
   }
 
-  isTeamTaken(team: 'white' | 'black') {
-    const teamPlayer = this.lobby?.players.find((p: any) => p.color === team);
-    return teamPlayer && teamPlayer.id !== this.myPlayerId;
-  }
-
   isPlayerReady() {
     const myPlayer = this.getMyPlayer();
     return myPlayer ? myPlayer.isReady : false;
@@ -149,13 +144,43 @@ export class LobbyComponent implements OnInit, OnDestroy {
     this.socketService.emit('startGame', { roomCode: this.roomCode });
   }
 
-  copyInviteLink() {
-    const inviteLink = `${window.location.origin}/lobby/${this.roomCode}`;
-    navigator.clipboard.writeText(inviteLink).then(() => {
-      alert('Invite link copied to clipboard!');
-    }, (err) => {
-      console.error('Could not copy text: ', err);
-    });
+  copyRoomCode() {
+    if (!this.roomCode) return;
+    // Use modern clipboard API if available, otherwise fall back to legacy method
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(this.roomCode).then(() => {
+            alert('Room code copied to clipboard!');
+        }, (err) => {
+            console.error('Could not copy text: ', err);
+            alert('Failed to copy room code.');
+        });
+    } else {
+        // Fallback for insecure contexts or older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = this.roomCode;
+        textArea.style.position = 'fixed'; // Avoid scrolling to bottom
+        textArea.style.top = '0';
+        textArea.style.left = '0';
+        textArea.style.opacity = '0';
+
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+
+        try {
+            const successful = document.execCommand('copy');
+            if (successful) {
+                alert('Room code copied to clipboard!');
+            } else {
+                alert('Failed to copy room code.');
+            }
+        } catch (err) {
+            console.error('Fallback copy failed: ', err);
+            alert('Failed to copy room code.');
+        }
+
+        document.body.removeChild(textArea);
+    }
   }
 
   leaveLobby() {

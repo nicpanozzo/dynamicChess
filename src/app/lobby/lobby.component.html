@@ -1,7 +1,7 @@
 <div class="lobby-container" *ngIf="lobby">
   <div class="room-info">
     <h2>Lobby: {{ lobby.roomCode }}</h2>
-    <button (click)="copyInviteLink()">Copy Invite Link</button>
+    <button (click)="copyRoomCode()">Copy Room Code</button>
   </div>
 
   <div class="teams-container">
@@ -10,7 +10,7 @@
       <div *ngFor="let player of getTeam('white')" class="player-card">
         {{ player.username }} <span *ngIf="player.isReady">✅</span>
       </div>
-      <button (click)="changeTeam('white')" [disabled]="isTeamTaken('white')">Join White</button>
+      <button (click)="changeTeam('white')">Join White</button>
     </div>
 
     <div class="team-column">
@@ -18,7 +18,7 @@
       <div *ngFor="let player of getTeam('black')" class="player-card">
         {{ player.username }} <span *ngIf="player.isReady">✅</span>
       </div>
-      <button (click)="changeTeam('black')" [disabled]="isTeamTaken('black')">Join Black</button>
+      <button (click)="changeTeam('black')">Join Black</button>
     </div>
 
     <div class="team-column">
