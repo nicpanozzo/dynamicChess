@@ -23,7 +23,7 @@
     <div class="action-buttons">
       <button (click)="createRoom()">Create Room</button>
       <div class="join-room-group">
-        <input type="text" [(ngModel)]="roomCode" placeholder="Enter Room Code">
+        <input type="text" [(ngModel)]="roomCode" placeholder="Enter Room Code" (keyup)="toUpperCase()">
         <button (click)="joinRoom()">Join Room</button>
       </div>
     </div>

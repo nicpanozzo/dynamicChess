@@ -95,4 +95,8 @@ export class HomeComponent implements OnInit, OnDestroy {
       alert('Please set a username and enter a room code.');
     }
   }
+
+  toUpperCase() {
+    this.roomCode = this.roomCode.toUpperCase();
+  }
 }
