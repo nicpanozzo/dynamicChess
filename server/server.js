@@ -64,10 +64,7 @@ function checkWinCondition(board) {
 io.on('connection', (socket) => {
     console.log('New client connected:', socket.id);
 
-    socket.on('debugState', () => {
-        console.log('[DEBUG] Server State Snapshot:');
-        console.log(JSON.stringify(rooms, null, 2));
-    });
+
 
     socket.on('createRoom', (data) => {
         const roomCode = generateUniqueRoomCode();

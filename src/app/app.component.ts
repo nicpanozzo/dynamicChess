@@ -20,7 +20,4 @@ export class AppComponent implements OnInit {
     this.socketService.connect();
   }
 
-  requestDebugState() {
-    this.socketService.emit('debugState', {});
-  }
 }

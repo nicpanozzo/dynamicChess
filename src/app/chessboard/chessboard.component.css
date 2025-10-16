@@ -1,9 +1,14 @@
 .chessboard-container {
+  border-radius: 20px;
+  background: #e0e5ec;
+  box-shadow: 9px 9px 16px #a3b1c6, -9px -9px 16px #ffffff;
+  padding: 20px;
   transition: transform 0.5s ease-in-out;
+  transform: rotate(90deg);
 }
 
 .chessboard-container.rotated {
-  transform: rotate(180deg);
+  transform: rotate(270deg);
 }
 
 .chessboard-container.rotated .board-cell {
@@ -12,16 +17,12 @@
 
 .chessboard {
   display: grid;
-  grid-template-columns: repeat(8, 60px); /* Increased size for better visibility */
-  grid-template-rows: repeat(8, 60px);    /* Increased size for better visibility */
-  width: 480px; /* 8 * 60px */
-  height: 480px; /* 8 * 60px */
-  border: 4px solid #4a2c2a; /* Darker, richer border */
-  box-shadow: 0 0 15px rgba(0, 0, 0, 0.5); /* Added shadow for depth */
-}
-
-.board-row {
-  display: contents;
+  grid-template-columns: repeat(8, 60px);
+  grid-template-rows: repeat(8, 60px);
+  width: 480px;
+  height: 480px;
+  border-radius: 10px;
+  overflow: hidden;
 }
 
 .board-cell {
@@ -30,55 +31,50 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  font-size: 40px; /* Larger pieces */
+  font-size: 40px;
   position: relative;
-  cursor: pointer; /* Indicate interactivity */
-  transition: background-color 0.2s ease-in-out; /* Smooth transition for hover/selection */
+  cursor: pointer;
 }
 
 .light-bg {
-  background-color: #f0d2b5; /* Warmer light square color */
+  background-color: #e0e5ec;
 }
 
 .dark-bg {
-  background-color: #b88b6a; /* Richer dark square color */
+  background-color: #c8d0e7;
 }
 
 .piece {
-  font-family: "Segoe UI Symbol", "Noto Color Emoji", sans-serif; /* Ensure good rendering of Unicode */
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5); /* Stronger shadow for pieces */
+  font-family: 'Material Symbols Outlined';
+  font-variation-settings: 'FILL' 1;
+  transform: rotate(-90deg);
 }
 
 .white-piece {
-  color: #ffffff; /* White color for white pieces */
+  color: #fff;
+  text-shadow: 1px 1px 2px #a3b1c6;
 }
 
 .black-piece {
-  color: #000000; /* Black color for black pieces */
-}
-
-.dark-bg .piece {
-  /* This rule is now redundant as colors are set by .white-piece and .black-piece */
-  /* color: #eee; */
+  color: #333;
+  text-shadow: 1px 1px 2px #ffffff;
 }
 
 .selected {
-  background-color: #ffeb3b; /* Vibrant yellow for selected */
-  box-shadow: inset 0 0 0 3px #ffc107; /* Inner shadow for selection */
+  background: #e0e5ec;
+  box-shadow: inset 5px 5px 10px #a3b1c6, inset -5px -5px 10px #ffffff;
 }
 
 .reached {
-  background-color: #8bc34a; /* Green for reached */
+  background-color: rgba(139, 195, 74, 0.5);
 }
 
 .landing {
-  background-color: lightblue; /* Blue for landing */
-  box-shadow: inset 0 0 0 3px #1976d2; /* Inner shadow for landing */
+  background-color: rgba(173, 216, 230, 0.7);
 }
 
 .illegal-landing {
-  background-color: #ff8c00; /* Orange for illegal landing */
-  box-shadow: inset 0 0 0 3px #cc7000; /* Darker orange inner shadow */
+  background-color: rgba(255, 140, 0, 0.7);
 }
 
 .cooldown-overlay {
@@ -87,62 +83,17 @@
   left: 0;
   width: 100%;
   height: 100%;
-  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.7), rgba(128, 128, 128, 0.7)); /* Dark gray to light gray gradient with transparency */
+  background: rgba(0, 0, 0, 0.2);
   display: flex;
   justify-content: center;
   align-items: center;
-  /* color: white; Removed as text-fill-color will make it transparent */
-  /* font-size: 1.5em; Removed as font-size is now on .cooldown-text */
-  /* text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.7); Removed as it's not needed with transparent text */
-  border-radius: 5px; /* Slightly rounded corners */
-  z-index: 10; /* Ensure it's on top */
-  transition: opacity 0.3s ease-in-out; /* Smooth transition for opacity */
+  z-index: 10;
 }
 
 .cooldown-text {
-  color: #cccccc; /* Light gray color for visibility */
-  font-weight: bold; /* Bold */
-  font-size: 1.5em; /* Smaller font size */
-  letter-spacing: 2px; /* Wide effect */
-}
-
-/* General layout styles - kept for context, but might need review for overall app */
-.container {
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding: 20px;
-}
-
-.sidebar {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin-left: 30px;
-  padding: 15px;
-  background-color: #f5f5f5;
-  border-radius: 8px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-}
-
-.vertical-bar-container {
-  width: 25px;
-  height: 120px;
-  border: 1px solid #ccc;
-  margin-bottom: 15px;
-  background-color: #e0e0e0;
-  border-radius: 5px;
-  overflow: hidden;
-}
-
-.vertical-bar {
-  width: 100%;
-  background-color: #4caf50; /* Green bar */
-  transition: height 0.3s ease-out;
-}
-
-.direction-icon {
-  font-size: 35px;
-  color: #555;
-  margin-top: 10px;
+  color: white;
+  font-weight: 600;
+  font-size: 1.5em;
+  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5);
+  transform: rotate(-90deg);
 }

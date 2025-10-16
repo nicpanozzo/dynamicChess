@@ -18,35 +18,7 @@
   </ng-template>
 
   <div *ngIf="savedUsername" class="game-setup">
-    <div class="cooldown-settings">
-      <h2>Cooldown Settings (ms)</h2>
-      <div class="cooldown-grid">
-        <div class="input-group">
-          <label for="pawnCooldown">Pawn:</label>
-          <input id="pawnCooldown" type="number" [(ngModel)]="pawnCooldown">
-        </div>
-        <div class="input-group">
-          <label for="knightCooldown">Knight:</label>
-          <input id="knightCooldown" type="number" [(ngModel)]="knightCooldown">
-        </div>
-        <div class="input-group">
-          <label for="bishopCooldown">Bishop:</label>
-          <input id="bishopCooldown" type="number" [(ngModel)]="bishopCooldown">
-        </div>
-        <div class="input-group">
-          <label for="rookCooldown">Rook:</label>
-          <input id="rookCooldown" type="number" [(ngModel)]="rookCooldown">
-        </div>
-        <div class="input-group">
-          <label for="queenCooldown">Queen:</label>
-          <input id="queenCooldown" type="number" [(ngModel)]="queenCooldown">
-        </div>
-        <div class="input-group">
-          <label for="kingCooldown">King:</label>
-          <input id="kingCooldown" type="number" [(ngModel)]="kingCooldown">
-        </div>
-      </div>
-    </div>
+
 
     <div class="action-buttons">
       <button (click)="createRoom()">Create Room</button>

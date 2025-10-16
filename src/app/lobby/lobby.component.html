@@ -1,16 +1,16 @@
 <div class="lobby-container" *ngIf="lobby">
   <div class="room-info">
     <h2>Lobby: {{ lobby.roomCode }}</h2>
-    <button (click)="copyRoomCode()">Copy Room Code</button>
     <span *ngIf="showCopyMessage" class="copy-success">✅ Copied!</span>
+    <button (click)="copyRoomCode()">Copy Room Code</button>
   </div>
 
   <div class="teams-container">
     <div class="team-column">
       <h3>White</h3>
       <div *ngFor="let player of getTeam('white')" class="player-card">
-        {{ player.username }} <span *ngIf="player.isReady">✅</span>
-        <button *ngIf="isOwner() && myPlayerId !== player.id" (click)="setOwner(player.id)">Set as Owner</button>
+        {{ player.username }} <span *ngIf="lobby.roomOwnerId === player.id">👑</span> <span *ngIf="player.isReady">✅</span>
+        <button *ngIf="isOwner() && myPlayerId !== player.id" (click)="setOwner(player.id)">♚</button>
       </div>
       <button (click)="changeTeam('white')">Join White</button>
     </div>
@@ -18,8 +18,8 @@
     <div class="team-column">
       <h3>Black</h3>
       <div *ngFor="let player of getTeam('black')" class="player-card">
-        {{ player.username }} <span *ngIf="player.isReady">✅</span>
-        <button *ngIf="isOwner() && myPlayerId !== player.id" (click)="setOwner(player.id)">Set as Owner</button>
+        {{ player.username }} <span *ngIf="lobby.roomOwnerId === player.id">👑</span> <span *ngIf="player.isReady">✅</span>
+        <button *ngIf="isOwner() && myPlayerId !== player.id" (click)="setOwner(player.id)">♚</button>
       </div>
       <button (click)="changeTeam('black')">Join Black</button>
     </div>
@@ -27,20 +27,48 @@
     <div class="team-column">
       <h3>Spectators</h3>
       <div *ngFor="let player of getTeam('spectator')" class="player-card">
-        {{ player.username }}
-        <button *ngIf="isOwner() && myPlayerId !== player.id" (click)="setOwner(player.id)">Set as Owner</button>
+        {{ player.username }} <span *ngIf="lobby.roomOwnerId === player.id">👑</span>
+        <button *ngIf="isOwner() && myPlayerId !== player.id" (click)="setOwner(player.id)">♚</button>
       </div>
       <button (click)="changeTeam('spectator')">Spectate</button>
     </div>
   </div>
 
-  <div class="actions-container">
-    <button (click)="toggleReady()" [disabled]="isSpectator()">
-      {{ isPlayerReady() ? 'Set Not Ready' : 'Set Ready' }}
-    </button>
+  <div class="main-content-container">
+    <div class="actions-container">
+      <button (click)="toggleReady()" [disabled]="isSpectator()">
+        {{ isPlayerReady() ? 'Set Not Ready' : 'Set Ready' }}
+      </button>
+      <div class="owner-actions" *ngIf="isOwner()">
+        <button class="start-game" (click)="startGame()" [disabled]="!canStartGame()">
+          {{ lobby.winner ? 'Start New Match' : 'Start Game' }}
+        </button>
+        <button (click)="swapTeams()">Swap Teams</button>
+      </div>
+    </div>
+
+    <div class="leaderboard-container">
+      <h3>Leaderboard</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Player</th>
+            <th>Wins</th>
+            <th>Losses</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let player of getLeaderboard()">
+            <td>{{ player.username }}</td>
+            <td>{{ player.wins }}</td>
+            <td>{{ player.losses }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 
-  <div class="owner-actions" *ngIf="isOwner()">
+  <div class="owner-settings" *ngIf="isOwner()">
     <hr>
     <h3>Room Settings (Owner)</h3>
     <div class="cooldown-settings" *ngIf="lobby.customCooldowns">
@@ -75,10 +103,6 @@
         <input id="sharedCooldowns" type="checkbox" [(ngModel)]="lobby.sharedCooldowns" (ngModelChange)="updateSettings()">
       </div>
     </div>
-    <button class="start-game" (click)="startGame()" [disabled]="!canStartGame()">
-      {{ lobby.winner ? 'Start New Match' : 'Start Game' }}
-    </button>
-    <button (click)="swapTeams()">Swap Teams</button>
     <p *ngIf="!canStartGame()" class="start-error">A player must be on each team (White and Black) and both must be ready.</p>
   </div>
 
