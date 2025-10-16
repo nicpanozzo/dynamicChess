@@ -158,6 +158,23 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('swapTeams', (data) => {
+        const { roomCode } = data;
+        const room = rooms[roomCode];
+        // Only allow owner to swap teams
+        if (room && room.roomOwnerId === socket.id) {
+            room.players.forEach(player => {
+                if (player.color === 'white') {
+                    player.color = 'black';
+                } else if (player.color === 'black') {
+                    player.color = 'white';
+                }
+            });
+            // After swapping, emit the new state to everyone in the room
+            io.to(roomCode).emit('lobbyState', room);
+        }
+    });
+
     socket.on('startGame', (data) => {
         const { roomCode } = data;
         const room = rooms[roomCode];

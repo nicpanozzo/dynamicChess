@@ -157,14 +157,43 @@ export class LobbyComponent implements OnInit, OnDestroy {
     }
   }
 
+  swapTeams() {
+    this.socketService.emit('swapTeams', { roomCode: this.roomCode });
+  }
+
   copyRoomCode() {
     if (!this.roomCode) return;
-    navigator.clipboard.writeText(this.roomCode).then(() => {
-      this.showCopyMessage = true;
-      setTimeout(() => this.showCopyMessage = false, 2000); // Hide after 2 seconds
-    }, (err) => {
-      console.error('Could not copy text: ', err);
-    });
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(this.roomCode).then(() => {
+            this.showCopyMessage = true;
+            setTimeout(() => this.showCopyMessage = false, 2000); // Hide after 2 seconds
+        }, (err) => {
+            console.error('Could not copy text: ', err);
+        });
+    } else {
+        const textArea = document.createElement('textarea');
+        textArea.value = this.roomCode;
+        textArea.style.position = 'fixed';
+        textArea.style.top = '0';
+        textArea.style.left = '0';
+        textArea.style.opacity = '0';
+
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+
+        try {
+            const successful = document.execCommand('copy');
+            if (successful) {
+                this.showCopyMessage = true;
+                setTimeout(() => this.showCopyMessage = false, 2000); // Hide after 2 seconds
+            }
+        } catch (err) {
+            console.error('Fallback copy failed: ', err);
+        }
+
+        document.body.removeChild(textArea);
+    }
   }
 
   leaveLobby() {
