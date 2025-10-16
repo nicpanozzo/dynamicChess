@@ -90,7 +90,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   joinRoom() {
     if (this.savedUsername && this.roomCode) {
-      this.socketService.emit('joinRoom', { username: this.savedUsername, roomCode: this.roomCode });
+      this.socketService.emit('enterRoom', { username: this.savedUsername, roomCode: this.roomCode });
     } else {
       alert('Please set a username and enter a room code.');
     }

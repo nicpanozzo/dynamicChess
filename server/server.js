@@ -87,45 +87,23 @@ io.on('connection', (socket) => {
         }, 100);
     });
 
-    socket.on('joinRoom', (data) => {
+    socket.on('enterRoom', (data) => {
         const { username, roomCode } = data;
         const room = rooms[roomCode];
         if (room) {
+            socket.join(roomCode);
             let player = room.players.find(p => p.username === username);
             if (player) {
                 // Player is reconnecting, update their socket ID
                 player.id = socket.id;
             } else {
-                // New player joining
+                // This case would be for a new player joining an existing room, which is the same as the old joinRoom
                 room.players.push({ id: socket.id, username: username, color: 'spectator', isReady: false, wins: 0, losses: 0 });
             }
-            socket.join(roomCode);
             io.to(roomCode).emit('lobbyState', room);
-            console.log(`${username} joined room ${roomCode}`);
+            console.log(`${username} entered room ${roomCode}`);
         } else {
             socket.emit('joinError', 'Room not found');
-        }
-    });
-
-    socket.on('joinLobby', (data) => {
-        const { roomCode, username } = data;
-        const room = rooms[roomCode];
-        if (room) {
-            socket.join(roomCode);
-            let player = room.players.find(p => p.username === username);
-            if (player) {
-                // Player is reconnecting, update their socket ID
-                player.id = socket.id;
-            }
-            // Broadcast to all in room to ensure sync
-            io.to(roomCode).emit('lobbyState', room);
-        }
-    });
-
-    socket.on('joinGame', (data) => {
-        const { roomCode } = data;
-        if (rooms[roomCode]) {
-            socket.join(roomCode);
         }
     });
 

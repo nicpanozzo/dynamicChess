@@ -1,7 +1,8 @@
 import { Component, OnInit, OnDestroy, NgZone } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { SocketService } from '../socket.service';
-import { LobbyService } from '../lobby.service'; // Import LobbyService
+import { LobbyService } from '../lobby.service';
+import { UserService } from '../user.service'; // Import UserService
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
@@ -24,7 +25,8 @@ export class LobbyComponent implements OnInit, OnDestroy {
     private router: Router,
     private socketService: SocketService,
     private zone: NgZone,
-    private lobbyService: LobbyService // Inject LobbyService
+    private lobbyService: LobbyService, // Inject LobbyService
+    private userService: UserService
   ) {
     this.myPlayerId = this.socketService.id;
     // Read the initial state directly from the service
@@ -34,9 +36,14 @@ export class LobbyComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.roomCode = this.route.snapshot.paramMap.get('roomCode')!;
 
-    // If we didn't get the state from the service (e.g., direct navigation), fetch it.
-    if (!this.lobby) {
-      this.socketService.emit('joinLobby', { roomCode: this.roomCode });
+    const username = this.userService.getUsername();
+
+    if (username) {
+      this.socketService.emit('enterRoom', { roomCode: this.roomCode, username: username });
+    } else {
+      // If for some reason there is no username, go back to home to create one.
+      this.router.navigate(['/']);
+      return;
     }
 
     this.subscriptions.add(

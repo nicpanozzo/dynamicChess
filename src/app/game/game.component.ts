@@ -48,11 +48,6 @@ export class GameComponent implements OnInit, AfterViewInit {
       }
     });
 
-    // Ensure we are joined to the game room for events
-    if (this.roomCode) {
-      this.socketService.emit('joinGame', { roomCode: this.roomCode });
-    }
-
     if (this.initialPlayers) {
         const opponent = this.initialPlayers.find(p => p.color !== this.playerColor);
         if (opponent) {
