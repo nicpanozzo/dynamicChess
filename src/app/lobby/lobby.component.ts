@@ -161,6 +161,10 @@ export class LobbyComponent implements OnInit, OnDestroy {
     this.socketService.emit('swapTeams', { roomCode: this.roomCode });
   }
 
+  setOwner(playerId: string) {
+    this.socketService.emit('setOwner', { roomCode: this.roomCode, playerId });
+  }
+
   copyRoomCode() {
     if (!this.roomCode) return;
     if (navigator.clipboard && window.isSecureContext) {
@@ -205,5 +209,12 @@ export class LobbyComponent implements OnInit, OnDestroy {
     } else {
         this.router.navigate(['/']);
     }
+  }
+
+  getLeaderboard() {
+    if (!this.lobby || !this.lobby.players) {
+      return [];
+    }
+    return this.lobby.players.slice().sort((a: any, b: any) => b.wins - a.wins);
   }
 }

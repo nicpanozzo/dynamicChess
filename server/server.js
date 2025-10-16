@@ -158,20 +158,15 @@ io.on('connection', (socket) => {
         }
     });
 
-    socket.on('swapTeams', (data) => {
-        const { roomCode } = data;
+    socket.on('setOwner', (data) => {
+        const { roomCode, playerId } = data;
         const room = rooms[roomCode];
-        // Only allow owner to swap teams
         if (room && room.roomOwnerId === socket.id) {
-            room.players.forEach(player => {
-                if (player.color === 'white') {
-                    player.color = 'black';
-                } else if (player.color === 'black') {
-                    player.color = 'white';
-                }
-            });
-            // After swapping, emit the new state to everyone in the room
-            io.to(roomCode).emit('lobbyState', room);
+            const newOwner = room.players.find(p => p.id === playerId);
+            if (newOwner) {
+                room.roomOwnerId = newOwner.id;
+                io.to(roomCode).emit('lobbyState', room);
+            }
         }
     });
 
@@ -310,36 +305,41 @@ io.on('connection', (socket) => {
         console.log('Client disconnected:', socket.id);
         for (const roomCode in rooms) {
             const room = rooms[roomCode];
-            const player = room.players.find(p => p.id === socket.id);
+            const playerIndex = room.players.findIndex(p => p.id === socket.id);
 
-            if (player) {
-                // Mark player as disconnected by clearing their socket ID
-                player.id = null;
-                player.isReady = false;
+            if (playerIndex !== -1) {
+                const player = room.players[playerIndex];
+                console.log(`${player.username} disconnected from room ${roomCode}`);
 
-                // Check if the game should end due to disconnect
+                // If the disconnected player was the owner, transfer ownership
+                if (room.roomOwnerId === socket.id) {
+                    room.players.splice(playerIndex, 1);
+                    if (room.players.length > 0) {
+                        const newOwner = room.players[0];
+                        room.roomOwnerId = newOwner.id;
+                        console.log(`Ownership transferred to ${newOwner.username}`);
+                    } else {
+                        delete rooms[roomCode];
+                        console.log(`Room ${roomCode} is empty and has been deleted.`);
+                        return;
+                    }
+                } else {
+                    room.players.splice(playerIndex, 1);
+                }
+
                 if (room.gameStarted && !room.winner) {
-                    const activePlayers = room.players.filter(p => p.id !== null && p.color !== 'spectator');
+                    const activePlayers = room.players.filter(p => p.color !== 'spectator');
                     if (activePlayers.length < 2) {
                         const remainingPlayer = activePlayers[0];
-                        if(remainingPlayer) {
+                        if (remainingPlayer) {
                             room.winner = remainingPlayer.color;
-                            // Update win/loss for all players
-                            room.players.forEach(p => {
-                                if (p.color === room.winner) {
-                                    p.wins = (p.wins || 0) + 1;
-                                } else if (p.color !== 'spectator') {
-                                    p.losses = (p.losses || 0) + 1;
-                                }
-                            });
                             io.to(roomCode).emit('gameOver', { winner: room.winner, board: room.board, players: room.players });
                         }
                     }
                 }
 
                 io.to(roomCode).emit('lobbyState', room);
-                io.to(roomCode).emit('playerDisconnected', { username: player.username });
-                break; // Exit loop once player is found and handled
+                break;
             }
         }
     });

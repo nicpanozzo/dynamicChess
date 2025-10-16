@@ -10,6 +10,7 @@
       <h3>White</h3>
       <div *ngFor="let player of getTeam('white')" class="player-card">
         {{ player.username }} <span *ngIf="player.isReady">✅</span>
+        <button *ngIf="isOwner() && myPlayerId !== player.id" (click)="setOwner(player.id)">Set as Owner</button>
       </div>
       <button (click)="changeTeam('white')">Join White</button>
     </div>
@@ -18,6 +19,7 @@
       <h3>Black</h3>
       <div *ngFor="let player of getTeam('black')" class="player-card">
         {{ player.username }} <span *ngIf="player.isReady">✅</span>
+        <button *ngIf="isOwner() && myPlayerId !== player.id" (click)="setOwner(player.id)">Set as Owner</button>
       </div>
       <button (click)="changeTeam('black')">Join Black</button>
     </div>
@@ -26,6 +28,7 @@
       <h3>Spectators</h3>
       <div *ngFor="let player of getTeam('spectator')" class="player-card">
         {{ player.username }}
+        <button *ngIf="isOwner() && myPlayerId !== player.id" (click)="setOwner(player.id)">Set as Owner</button>
       </div>
       <button (click)="changeTeam('spectator')">Spectate</button>
     </div>
@@ -77,6 +80,26 @@
 
   <div class="footer-actions">
       <button (click)="leaveLobby()">Leave Lobby</button>
+  </div>
+
+  <div class="leaderboard-container">
+    <h3>Leaderboard</h3>
+    <table>
+      <thead>
+        <tr>
+          <th>Player</th>
+          <th>Wins</th>
+          <th>Losses</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let player of getLeaderboard()">
+          <td>{{ player.username }}</td>
+          <td>{{ player.wins }}</td>
+          <td>{{ player.losses }}</td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 
 </div>
