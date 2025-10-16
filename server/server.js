@@ -74,6 +74,7 @@ io.on('connection', (socket) => {
         rooms[roomCode] = {
             players: [{ id: socket.id, username: data.username, color: 'white', isReady: false, wins: 0, losses: 0 }],
             customCooldowns: data.customCooldowns,
+            sharedCooldowns: false, // Initialize sharedCooldowns
             roomOwnerId: socket.id,
             gameStarted: false,
             board: null,
@@ -133,10 +134,11 @@ io.on('connection', (socket) => {
     });
 
     socket.on('updateSettings', (data) => {
-        const { roomCode, customCooldowns } = data;
+        const { roomCode, customCooldowns, sharedCooldowns } = data;
         const room = rooms[roomCode];
         if (room && room.roomOwnerId === socket.id) {
             room.customCooldowns = customCooldowns;
+            room.sharedCooldowns = sharedCooldowns;
             io.to(roomCode).emit('lobbyState', room);
         }
     });
@@ -277,6 +279,11 @@ io.on('connection', (socket) => {
                 io.to(roomCode).emit('gameOver', { winner, board: room.board, players: playersPayload });
             } else {
                 io.to(roomCode).emit('moveMade', { move, board: room.board });
+                if (room.sharedCooldowns) {
+                    const pieceType = room.board[endRow][endCol].toLowerCase();
+                    const cooldown = room.customCooldowns[pieceType];
+                    io.to(roomCode).emit('cooldownUpdate', { piece: `${endRow}-${endCol}`, cooldown });
+                }
             }
         }
     });

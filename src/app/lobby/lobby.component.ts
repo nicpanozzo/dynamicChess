@@ -62,7 +62,8 @@ export class LobbyComponent implements OnInit, OnDestroy {
             queryParams: { 
               room: gameState.roomCode, 
               color: this.getMyPlayer()?.color, 
-              customCooldowns: JSON.stringify(gameState.customCooldowns) 
+              customCooldowns: JSON.stringify(gameState.customCooldowns),
+              sharedCooldowns: gameState.sharedCooldowns
             },
             state: { board: gameState.board, players: gameState.players } 
           });
@@ -145,7 +146,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
 
   updateSettings() {
     if (this.isOwner()) {
-      this.socketService.emit('updateSettings', { roomCode: this.roomCode, customCooldowns: this.lobby.customCooldowns });
+      this.socketService.emit('updateSettings', { roomCode: this.roomCode, customCooldowns: this.lobby.customCooldowns, sharedCooldowns: this.lobby.sharedCooldowns });
     }
   }
 

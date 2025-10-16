@@ -1,5 +1,6 @@
-import { Component, HostListener, OnDestroy, Input } from '@angular/core';
+import { Component, HostListener, OnDestroy, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { SocketService } from '../socket.service'; // Import SocketService
 
 @Component({
   selector: 'app-chessboard',
@@ -10,6 +11,8 @@ import { CommonModule } from '@angular/common';
 })
 export class ChessboardComponent implements OnDestroy {
   @Input() playerColor: 'white' | 'black' | 'spectator' | null = null;
+  @Input() sharedCooldowns: boolean = false;
+  @Output() moveMade = new EventEmitter<{ startRow: number, startCol: number, endRow: number, endCol: number }>();
 
   private _customCooldowns: { [key: string]: number } | null = null;
 
@@ -101,11 +104,18 @@ export class ChessboardComponent implements OnDestroy {
     }
   }
 
-  constructor() {
+  constructor(private socketService: SocketService) {
     this.initializeBoard();
     this.cooldownInterval = setInterval(() => {
       // This will trigger change detection
     }, 100);
+
+    this.socketService.listen('cooldownUpdate').subscribe((data: { piece: string, cooldown: number }) => {
+      if (this.sharedCooldowns) {
+        const pieceType = data.piece.toLowerCase() as keyof typeof this.pieceCooldowns;
+        this.cooldowns.set(data.piece, Date.now() + data.cooldown);
+      }
+    });
   }
 
   ngOnDestroy() {
@@ -370,6 +380,7 @@ export class ChessboardComponent implements OnDestroy {
     if (cooldown > 0) {
       this.cooldowns.set(`${endRow}-${endCol}`, Date.now() + cooldown);
     }
+    this.moveMade.emit({ startRow, startCol, endRow, endCol });
   }
 
   updatePressPercentage() {

@@ -23,6 +23,7 @@ export class GameComponent implements OnInit, AfterViewInit, OnDestroy {
   playerWins: number = 0;
   playerLosses: number = 0;
   customCooldowns: { [key: string]: number } | null = null;
+  sharedCooldowns: boolean = false;
 
   private initialBoard: string[][] | null = null;
   private initialPlayers: any[] | null = null;
@@ -48,6 +49,7 @@ export class GameComponent implements OnInit, AfterViewInit, OnDestroy {
       if (params['customCooldowns']) {
         this.customCooldowns = JSON.parse(params['customCooldowns']);
       }
+      this.sharedCooldowns = params['sharedCooldowns'] === 'true';
     });
 
     if (this.initialPlayers) {
@@ -108,26 +110,17 @@ export class GameComponent implements OnInit, AfterViewInit, OnDestroy {
       }
       this.chessboard.playerColor = this.playerColor;
       this.chessboard.customCooldowns = this.customCooldowns;
+      this.chessboard.sharedCooldowns = this.sharedCooldowns;
 
-      const originalMove = this.chessboard.move.bind(this.chessboard);
-      this.chessboard.move = (startRow, startCol, endRow, endCol) => {
+      this.chessboard.moveMade.subscribe(move => {
         if (this.roomCode && !this.isGameOver) {
-          originalMove(startRow, startCol, endRow, endCol);
-
           this.socketService.emit('makeMove', {
             roomCode: this.roomCode,
             playerColor: this.playerColor,
-            move: {
-              startRow, startCol, endRow, endCol,
-              newBoard: this.chessboard.board,
-            }
+            move: move
           });
-        } else if (this.isGameOver) {
-          console.log("Game is over.");
-        } else {
-          console.log("Not in a multiplayer room.");
         }
-      };
+      });
     }
   }
 

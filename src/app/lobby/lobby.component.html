@@ -70,6 +70,10 @@
           <input id="kingCooldown" type="number" [(ngModel)]="lobby.customCooldowns.k" (ngModelChange)="updateSettings()">
         </div>
       </div>
+      <div class="input-group">
+        <label for="sharedCooldowns">Shared Cooldowns:</label>
+        <input id="sharedCooldowns" type="checkbox" [(ngModel)]="lobby.sharedCooldowns" (ngModelChange)="updateSettings()">
+      </div>
     </div>
     <button class="start-game" (click)="startGame()" [disabled]="!canStartGame()">
       {{ lobby.winner ? 'Start New Match' : 'Start Game' }}
