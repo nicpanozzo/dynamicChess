@@ -181,12 +181,25 @@ io.on('connection', (socket) => {
 
             room.gameStarted = true;
             room.board = initialBoardState();
+            room.winner = null; // Reset winner for the new game
             room.players.forEach(p => {
                 p.wins = 0;
                 p.losses = 0;
             });
             io.to(roomCode).emit('gameStarted', room);
             console.log(`Game started in room ${roomCode}`);
+        }
+    });
+
+    socket.on('startNewMatch', (data) => {
+        const { roomCode } = data;
+        const room = rooms[roomCode];
+        if (room && room.roomOwnerId === socket.id) {
+            room.gameStarted = true;
+            room.board = initialBoardState();
+            room.winner = null;
+            io.to(roomCode).emit('gameStarted', room);
+            console.log(`New match started in room ${roomCode}`);
         }
     });
 

@@ -120,6 +120,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
 
   canStartGame() {
     if (!this.lobby) return false;
+    if (this.lobby.winner) return true; // Always allow starting a new match if there is a winner
     const whitePlayer = this.lobby.players.find((p: any) => p.color === 'white');
     const blackPlayer = this.lobby.players.find((p: any) => p.color === 'black');
     if (!whitePlayer || !blackPlayer) return false;
@@ -148,7 +149,11 @@ export class LobbyComponent implements OnInit, OnDestroy {
   }
 
   startGame() {
-    this.socketService.emit('startGame', { roomCode: this.roomCode });
+    if (this.lobby.winner) {
+      this.socketService.emit('startNewMatch', { roomCode: this.roomCode });
+    } else {
+      this.socketService.emit('startGame', { roomCode: this.roomCode });
+    }
   }
 
   copyRoomCode() {

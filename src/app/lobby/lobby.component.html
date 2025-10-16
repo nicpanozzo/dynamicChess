@@ -67,7 +67,9 @@
         </div>
       </div>
     </div>
-    <button class="start-game" (click)="startGame()" [disabled]="!canStartGame()">Start Game</button>
+    <button class="start-game" (click)="startGame()" [disabled]="!canStartGame()">
+      {{ lobby.winner ? 'Start New Match' : 'Start Game' }}
+    </button>
     <p *ngIf="!canStartGame()" class="start-error">A player must be on each team (White and Black) and both must be ready.</p>
   </div>
 

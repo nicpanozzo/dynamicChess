@@ -1,4 +1,5 @@
-import { Component, OnInit, ViewChild, AfterViewInit, ChangeDetectorRef, NgZone } from '@angular/core';
+import { Component, OnInit, OnDestroy, ViewChild, AfterViewInit, NgZone } from '@angular/core';
+import { Subscription } from 'rxjs';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { ChessboardComponent } from '../chessboard/chessboard.component';
@@ -11,7 +12,7 @@ import { SocketService } from '../socket.service';
   templateUrl: './game.component.html',
   styleUrls: ['./game.component.css']
 })
-export class GameComponent implements OnInit, AfterViewInit {
+export class GameComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild(ChessboardComponent) chessboard!: ChessboardComponent;
 
   roomCode: string | null = null;
@@ -25,6 +26,7 @@ export class GameComponent implements OnInit, AfterViewInit {
 
   private initialBoard: string[][] | null = null;
   private initialPlayers: any[] | null = null;
+  private subscriptions = new Subscription();
 
   constructor(
     private route: ActivatedRoute,
@@ -56,23 +58,23 @@ export class GameComponent implements OnInit, AfterViewInit {
     }
 
 
-    this.socketService.listen('moveMade').subscribe((data: { move: any, board: string[][] }) => {
+    this.subscriptions.add(this.socketService.listen('moveMade').subscribe((data: { move: any, board: string[][] }) => {
       console.log('[DEBUG] moveMade event received by client.', data);
       this.zone.run(() => {
         if (this.chessboard) {
           this.chessboard.board = data.board;
         }
       });
-    });
+    }));
 
-    this.socketService.listen('playerDisconnected').subscribe((data: { username: string }) => {
+    this.subscriptions.add(this.socketService.listen('playerDisconnected').subscribe((data: { username: string }) => {
       this.zone.run(() => {
         this.opponentUsername = `${data.username} disconnected.`;
         // The server will send a 'gameOver' event to handle the game end state.
       });
-    });
+    }));
 
-    this.socketService.listen('gameOver').subscribe((data: { winner: 'white' | 'black', board: string[][], players: any[] }) => {
+    this.subscriptions.add(this.socketService.listen('gameOver').subscribe((data: { winner: 'white' | 'black', board: string[][], players: any[] }) => {
       this.zone.run(() => {
         console.log('Game Over event received:', data);
         this.isGameOver = true;
@@ -86,13 +88,17 @@ export class GameComponent implements OnInit, AfterViewInit {
             this.playerLosses = myPlayer.losses;
         }
       });
-    });
+    }));
 
-    this.socketService.listen('moveError').subscribe((message: string) => {
+    this.subscriptions.add(this.socketService.listen('moveError').subscribe((message: string) => {
       this.zone.run(() => {
         alert(`Move Error: ${message}`);
       });
-    });
+    }));
+  }
+
+  ngOnDestroy() {
+    this.subscriptions.unsubscribe();
   }
 
   ngAfterViewInit() {
