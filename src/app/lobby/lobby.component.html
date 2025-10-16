@@ -2,6 +2,7 @@
   <div class="room-info">
     <h2>Lobby: {{ lobby.roomCode }}</h2>
     <button (click)="copyRoomCode()">Copy Room Code</button>
+    <span *ngIf="showCopyMessage" class="copy-success">✅ Copied!</span>
   </div>
 
   <div class="teams-container">

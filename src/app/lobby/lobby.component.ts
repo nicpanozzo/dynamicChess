@@ -18,6 +18,7 @@ export class LobbyComponent implements OnInit, OnDestroy {
   lobby: any = null;
   roomCode: string = '';
   myPlayerId: string | undefined = '';
+  showCopyMessage = false;
   private subscriptions = new Subscription();
 
   constructor(
@@ -158,41 +159,12 @@ export class LobbyComponent implements OnInit, OnDestroy {
 
   copyRoomCode() {
     if (!this.roomCode) return;
-    // Use modern clipboard API if available, otherwise fall back to legacy method
-    if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(this.roomCode).then(() => {
-            alert('Room code copied to clipboard!');
-        }, (err) => {
-            console.error('Could not copy text: ', err);
-            alert('Failed to copy room code.');
-        });
-    } else {
-        // Fallback for insecure contexts or older browsers
-        const textArea = document.createElement('textarea');
-        textArea.value = this.roomCode;
-        textArea.style.position = 'fixed'; // Avoid scrolling to bottom
-        textArea.style.top = '0';
-        textArea.style.left = '0';
-        textArea.style.opacity = '0';
-
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-
-        try {
-            const successful = document.execCommand('copy');
-            if (successful) {
-                alert('Room code copied to clipboard!');
-            } else {
-                alert('Failed to copy room code.');
-            }
-        } catch (err) {
-            console.error('Fallback copy failed: ', err);
-            alert('Failed to copy room code.');
-        }
-
-        document.body.removeChild(textArea);
-    }
+    navigator.clipboard.writeText(this.roomCode).then(() => {
+      this.showCopyMessage = true;
+      setTimeout(() => this.showCopyMessage = false, 2000); // Hide after 2 seconds
+    }, (err) => {
+      console.error('Could not copy text: ', err);
+    });
   }
 
   leaveLobby() {

@@ -183,6 +183,7 @@ io.on('connection', (socket) => {
             room.board = initialBoardState();
             room.winner = null; // Reset winner for the new game
             room.players.forEach(p => {
+                p.isReady = false; // Reset readiness
                 p.wins = 0;
                 p.losses = 0;
             });
@@ -198,6 +199,7 @@ io.on('connection', (socket) => {
             room.gameStarted = true;
             room.board = initialBoardState();
             room.winner = null;
+            room.players.forEach(p => p.isReady = false); // Reset readiness
             io.to(roomCode).emit('gameStarted', room);
             console.log(`New match started in room ${roomCode}`);
         }
