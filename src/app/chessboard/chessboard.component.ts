@@ -41,6 +41,7 @@ export class ChessboardComponent implements OnDestroy {
   cooldowns = new Map<string, number>();
   currentPieceIndex = 0;
   cooldownInterval: any;
+  moveQueue = new Map<string, { endRow: number; endCol: number }[]>();
 
   pieceCooldowns: { [key: string]: number } = {
     p: 2000,
@@ -107,7 +108,7 @@ export class ChessboardComponent implements OnDestroy {
   constructor(private socketService: SocketService) {
     this.initializeBoard();
     this.cooldownInterval = setInterval(() => {
-      // This will trigger change detection
+      this.processMoveQueue();
     }, 100);
 
     this.socketService.listen('cooldownUpdate').subscribe((data: { piece: string, cooldown: number }) => {
@@ -116,6 +117,33 @@ export class ChessboardComponent implements OnDestroy {
         this.cooldowns.set(data.piece, Date.now() + data.cooldown);
       }
     });
+  }
+
+  processMoveQueue() {
+    const now = Date.now();
+    for (const pieceKey of Array.from(this.moveQueue.keys())) {
+      const queue = this.moveQueue.get(pieceKey);
+      if (queue && queue.length > 0) {
+        const [row, col] = pieceKey.split('-').map(Number);
+        const cooldown = this.cooldowns.get(pieceKey);
+
+        if (!cooldown || cooldown < now) {
+          this.cooldowns.delete(pieceKey);
+          const move = queue.shift()!;
+          const piece = this.board[row][col];
+          if (piece) {
+            if (this.isValidMove(row, col, move.endRow, move.endCol)) {
+              this.move(row, col, move.endRow, move.endCol);
+              const newPieceKey = `${move.endRow}-${move.endCol}`;
+              if (queue.length > 0) {
+                this.moveQueue.set(newPieceKey, queue);
+              }
+              this.moveQueue.delete(pieceKey);
+            }
+          }
+        }
+      }
+    }
   }
 
   ngOnDestroy() {
@@ -141,21 +169,26 @@ export class ChessboardComponent implements OnDestroy {
     const piece = this.board[row][col];
 
     if (this.selectedPieces.length > 0) {
-      this.selectedPieces.forEach(selectedPiece => {
-        if (this.isValidMove(selectedPiece.row, selectedPiece.col, row, col)) {
-          this.move(selectedPiece.row, selectedPiece.col, row, col);
+      const pieceToMove = this.selectedPieces[0];
+      const pieceKey = `${pieceToMove.row}-${pieceToMove.col}`;
+      const cooldown = this.cooldowns.get(pieceKey);
+
+      if (cooldown && cooldown > Date.now()) {
+        const queue = this.moveQueue.get(pieceKey) || [];
+        queue.push({ endRow: row, endCol: col });
+        this.moveQueue.set(pieceKey, queue);
+      } else {
+        if (this.isValidMove(pieceToMove.row, pieceToMove.col, row, col)) {
+          this.move(pieceToMove.row, pieceToMove.col, row, col);
         }
-      });
+      }
       this.selectedPieces = [];
     } else if (piece) {
       const isWhitePiece = piece === piece.toUpperCase();
       const isBlackPiece = piece === piece.toLowerCase();
 
       if ((this.playerColor === 'white' && isWhitePiece) || (this.playerColor === 'black' && isBlackPiece)) {
-        const cooldown = this.cooldowns.get(`${row}-${col}`);
-        if (!cooldown || cooldown < Date.now()) {
-          this.selectedPieces = [{ row, col, piece }];
-        }
+        this.selectedPieces = [{ row, col, piece }];
       }
     }
   }
@@ -517,12 +550,12 @@ export class ChessboardComponent implements OnDestroy {
       case 'b': return '♝';
       case 'q': return '♛';
       case 'k': return '♚';
-      case 'P': return '♙';
-      case 'R': return '♖';
-      case 'N': return '♘';
-      case 'B': return '♗';
-      case 'Q': return '♕';
-      case 'K': return '♔';
+      case 'P': return '♟';
+      case 'R': return '♜';
+      case 'N': return '♞';
+      case 'B': return '♝';
+      case 'Q': return '♛';
+      case 'K': return '♚';
       default: return '';
     }
   }
