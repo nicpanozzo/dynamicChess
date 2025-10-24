@@ -1,60 +1,50 @@
 .game-container {
   display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding: 40px;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  font-family: 'Poppins', sans-serif;
 }
 
-.game-info {
-  margin-right: 40px;
-  padding: 20px;
+.game-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  max-width: 1200px;
+  padding: 15px 30px;
   border-radius: 20px;
   background: #e0e5ec;
   box-shadow: 9px 9px 16px #a3b1c6, -9px -9px 16px #ffffff;
-  min-width: 220px;
+  margin-bottom: 20px;
 }
 
-.game-info p {
-  margin-bottom: 15px;
-  font-size: 1.1em;
-  color: #333;
-  font-weight: 500;
-}
-
-.game-info b {
-  font-weight: 700;
-}
-
-.game-over-message {
-  margin-top: 20px;
-  padding: 20px;
-  border-radius: 15px;
-  background: #e0e5ec;
-  box-shadow: inset 5px 5px 10px #a3b1c6, inset -5px -5px 10px #ffffff;
-  text-align: center;
-}
-
-.game-over-message h2 {
-  margin-top: 0;
+.header-left h1 {
+  font-size: 1.5em;
   font-weight: 600;
+  margin: 0;
   color: #333;
 }
 
-.game-over-message p {
-  margin-bottom: 0;
-  font-size: 1.2em;
+.opponent-info {
+  font-size: 0.9em;
+  color: #555;
+}
+
+.header-center .scores {
+  display: flex;
+  gap: 20px;
+  font-size: 1.1em;
   font-weight: 500;
 }
 
-.game-controls {
-  margin-left: 40px;
+.header-right {
   display: flex;
-  flex-direction: column;
   gap: 15px;
 }
 
-.game-controls button {
-  padding: 12px 20px;
+.header-right button {
+  padding: 10px 15px;
   border: none;
   border-radius: 10px;
   background: #e0e5ec;
@@ -65,41 +55,83 @@
   transition: all 0.2s ease-in-out;
 }
 
-.game-controls button:hover {
+.header-right button:hover {
   box-shadow: 2px 2px 5px #a3b1c6, -2px -2px 5px #ffffff;
 }
 
-.game-controls button:active {
+.header-right button:active {
   box-shadow: inset 5px 5px 10px #a3b1c6, inset -5px -5px 10px #ffffff;
 }
 
-.game-end-actions {
+.game-area {
   display: flex;
-  flex-direction: column;
-  gap: 15px;
-  margin-top: 15px;
+  gap: 20px;
 }
 
-.game-end-actions button {
+.commands {
   width: 100%;
-}
-
-.commands-recap {
-  margin-top: 30px;
-  padding: 20px;
+  max-width: 1200px;
+  padding: 20px 30px;
   border-radius: 20px;
   background: #e0e5ec;
   box-shadow: 9px 9px 16px #a3b1c6, -9px -9px 16px #ffffff;
+  margin-top: -10px;
+  z-index: 10;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease-in-out;
 }
 
-.commands-recap h3 {
+.commands h3 {
   margin-top: 0;
-  font-weight: 600;
-  color: #333;
 }
 
-.commands-recap p {
+.commands ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+.commands li {
   margin-bottom: 10px;
-  color: #555;
-  font-weight: 500;
+}
+
+.game-over-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.game-over-modal {
+  padding: 30px;
+  border-radius: 20px;
+  background: #e0e5ec;
+  box-shadow: 9px 9px 16px #a3b1c6, -9px -9px 16px #ffffff;
+  text-align: center;
+}
+
+.game-over-modal h2 {
+  font-size: 2em;
+  margin-bottom: 10px;
+}
+
+.game-over-modal p {
+  font-size: 1.2em;
+  margin-bottom: 20px;
+}
+
+.game-over-modal button {
+  padding: 12px 25px;
+  border: none;
+  border-radius: 10px;
+  background: #e0e5ec;
+  color: #333;
+  cursor: pointer;
+  font-weight: 600;
+  box-shadow: 5px 5px 10px #a3b1c6, -5px -5px 10px #ffffff;
 }

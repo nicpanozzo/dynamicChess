@@ -1,27 +1,60 @@
-<div class="game-container">
-  <div class="game-info">
-    <p *ngIf="roomCode">Room Code: <b>{{ roomCode }}</b></p>
-    <p *ngIf="playerColor">You are: <b [style.color]="playerColor === 'white' ? 'white' : 'black'">{{ playerColor }}</b></p>
-    <p>Opponent: <b>{{ opponentUsername }}</b></p>
-    <p>Your Record: {{ playerWins }} W - {{ playerLosses }} L</p>
-    <div *ngIf="isGameOver" class="game-over-message">
-      <h2>Game Over!</h2>
-      <p>Winner: <b [style.color]="winner === 'white' ? 'white' : 'black'">{{ winner?.toUpperCase() }}</b></p>
+<div class="game-container" *ngIf="roomCode">
+  <div class="game-header">
+    <div class="header-left">
+      <h1>Room: {{ roomCode }}</h1>
+      <div class="opponent-info">
+        Opponent: {{ opponentUsername }}
+      </div>
+    </div>
+    <div class="header-center">
+      <div class="scores">
+        <span>Wins: {{ playerWins }}</span>
+        <span>Losses: {{ playerLosses }}</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <button (click)="resign()">Resign</button>
+      <button (click)="showCommands = !showCommands">Commands</button>
     </div>
   </div>
-  <app-chessboard></app-chessboard>
-  <div class="game-controls">
-    <button *ngIf="!isGameOver && playerColor !== 'spectator'" (click)="resign()">Resign</button>
-    <div *ngIf="isGameOver" class="game-end-actions">
+
+  <div class="game-area">
+    <app-chessboard
+      #chessboard
+      [playerColor]="playerColor"
+      [customCooldowns]="customCooldowns"
+      [sharedCooldowns]="sharedCooldowns">
+    </app-chessboard>
+    <app-move-queue
+      [moveQueue]="moveQueue"
+      [playerColor]="playerColor"
+      (moveReordered)="onMoveReordered($event)"
+      (moveCancelled)="onMoveCancelled($event)">
+    </app-move-queue>
+  </div>
+
+  <div class="commands" *ngIf="showCommands">
+    <h3>Commands</h3>
+    <ul>
+      <li><strong>Piece Selection:</strong> Press the key corresponding to the piece type (e.g., 'p' for pawn, 'r' for rook).</li>
+      <li><strong>Select All Pieces:</strong> Hold Shift and press the piece key to select all pieces of that type.</li>
+      <li><strong>Cycle Through Pieces:</strong> Press the piece key repeatedly to cycle through all pieces of that type.</li>
+      <li><strong>Move Direction:</strong> Use the numpad keys (1-9, excluding 5) to set the direction of the move.</li>
+      <li><strong>Move Distance:</strong> Hold the numpad key to increase the move distance (for sliders).</li>
+      <li><strong>Cancel Move:</strong> Press '5' on the numpad while holding a direction key to cancel the move.</li>
+    </ul>
+  </div>
+
+  <div class="game-over-overlay" *ngIf="isGameOver">
+    <div class="game-over-modal">
+      <h2>Game Over</h2>
+      <p *ngIf="winner">Winner: {{ winner }}</p>
+      <p *ngIf="!winner">Draw</p>
       <button (click)="backToLobby()">Back to Lobby</button>
-      <button (click)="leaveGameAndDisconnect()">Leave Game</button>
-    </div>
-    <div class="commands-recap">
-      <h3>Commands</h3>
-      <p><b>p, r, n, b, q, k:</b> Select piece type</p>
-      <p><b>Shift + key:</b> Select all pieces of a type</p>
-      <p><b>Numpad 1-9:</b> Move piece</p>
-      <p><b>5:</b> Cancel move (half cooldown)</p>
     </div>
   </div>
+</div>
+
+<div *ngIf="!roomCode">
+  <p>Loading game...</p>
 </div>

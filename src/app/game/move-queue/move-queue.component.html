@@ -1,0 +1,16 @@
+<div class="move-queue-container">
+  <h4>Move Queues</h4>
+<div *ngFor="let item of moveQueuesAsArray; trackBy: trackByPieceKey" class="piece-queue">
+    <h4>Piece at {{ getPieceNotation(item[0]) }}</h4>
+    <div cdkDropList [cdkDropListData]="item[1]" (cdkDropListDropped)="drop($event, item[0])">
+      <div *ngFor="let move of item[1]; let i = index; trackBy: trackByMove" class="move-item" cdkDrag>
+        <div class="move-content">
+        <span>{{ getMoveNotation(move) }}</span>
+        <button (click)="moveUp(item[0], i)">Up</button>
+        <button (click)="moveDown(item[0], i)">Down</button>
+        <button (click)="cancelMove(item[0], i)">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

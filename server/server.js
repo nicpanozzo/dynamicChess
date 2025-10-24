@@ -16,6 +16,163 @@ const io = socketIo(server, {
 });
 
 const rooms = {}; // Stores room data
+const pieceCooldowns = {
+    p: 2000,
+    n: 6000,
+    b: 6000,
+    r: 9000,
+    q: 0,
+    k: 0
+};
+
+function processMoveQueues() {
+    const now = Date.now();
+    for (const roomCode in rooms) {
+        const room = rooms[roomCode];
+        if (!room.gameStarted || room.winner) continue;
+
+        for (const pieceKey in room.moveQueue) {
+            const queue = room.moveQueue[pieceKey];
+            if (queue.length === 0) continue;
+
+            const cooldown = room.cooldowns[pieceKey];
+            if (!cooldown || now >= cooldown) {
+                const move = queue.shift();
+                const { startRow, startCol } = getCoordsFromKey(pieceKey);
+                const piece = room.board[startRow][startCol];
+
+                if (piece && isValidMove(room.board, startRow, startCol, move.endRow, move.endCol)) {
+                    let pieceToMove = room.board[startRow][startCol];
+                    if (pieceToMove.toLowerCase() === 'p' && (move.endRow === 0 || move.endRow === 7)) {
+                        pieceToMove = (pieceToMove === 'P') ? 'Q' : 'q';
+                    }
+                    room.board[move.endRow][move.endCol] = pieceToMove;
+                    room.board[startRow][startCol] = '';
+
+                    const newPieceKey = `${move.endRow}-${move.endCol}`;
+                    room.cooldowns[newPieceKey] = now + (room.customCooldowns[piece.toLowerCase()] || pieceCooldowns[piece.toLowerCase()]);
+                    io.to(roomCode).emit('cooldownsUpdated', room.cooldowns);
+
+                    if (queue.length > 0) {
+                        room.moveQueue[newPieceKey] = queue;
+                    }
+                    delete room.moveQueue[pieceKey];
+
+                    const winner = checkWinCondition(room.board);
+                    if (winner) {
+                        room.winner = winner;
+                        io.to(roomCode).emit('gameOver', { winner, board: room.board, players: room.players });
+                    } else {
+                        io.to(roomCode).emit('moveMade', { move, board: room.board });
+                        io.to(roomCode).emit('queueUpdated', room.moveQueue);
+                    }
+                } else {
+                    // Invalid move in queue, discard
+                    io.to(roomCode).emit('queueUpdated', room.moveQueue);
+                }
+            }
+        }
+    }
+}
+
+function getCoordsFromKey(key) {
+    const [startRow, startCol] = key.split('-').map(Number);
+    return { startRow, startCol };
+}
+
+function isValidMove(board, startRow, startCol, endRow, endCol) {
+    const piece = board[startRow][startCol];
+    if (!piece) return false;
+    const targetPiece = board[endRow][endCol];
+
+    const movingPieceIsWhite = piece === piece.toUpperCase();
+    const movingPieceIsBlack = piece === piece.toLowerCase();
+
+    if (targetPiece) {
+        const targetPieceIsWhite = targetPiece === targetPiece.toUpperCase();
+        const targetPieceIsBlack = targetPiece === targetPiece.toLowerCase();
+        if ((movingPieceIsWhite && targetPieceIsWhite) || (movingPieceIsBlack && targetPieceIsBlack)) {
+            return false;
+        }
+    }
+
+    if (endRow < 0 || endRow > 7 || endCol < 0 || endCol > 7) {
+        return false;
+    }
+
+    switch (piece.toLowerCase()) {
+        case 'p': // Pawn
+            const direction = piece === 'p' ? 1 : -1;
+            const initialRow = piece === 'p' ? 1 : 6;
+            if (startCol === endCol) {
+                if (startRow === initialRow && endRow === startRow + 2 * direction && !board[startRow + direction][endCol] && !board[endRow][endCol]) {
+                    return true;
+                }
+                if (endRow === startRow + direction && !board[endRow][endCol]) {
+                    return true;
+                }
+            } else if (Math.abs(startCol - endCol) === 1 && endRow === startRow + direction && targetPiece) {
+                return true;
+            }
+            break;
+        case 'r': // Rook
+            if (startRow === endRow) {
+                const step = endCol > startCol ? 1 : -1;
+                for (let col = startCol + step; col !== endCol; col += step) {
+                    if (board[startRow][col]) return false;
+                }
+                return true;
+            }
+            if (startCol === endCol) {
+                const step = endRow > startRow ? 1 : -1;
+                for (let row = startRow + step; row !== endRow; row += step) {
+                    if (board[row][startCol]) return false;
+                }
+                return true;
+            }
+            break;
+        case 'n': // Knight
+            const dx = Math.abs(startRow - endRow);
+            const dy = Math.abs(startCol - endCol);
+            return (dx === 2 && dy === 1) || (dx === 1 && dy === 2);
+        case 'b': // Bishop
+            if (Math.abs(startRow - endRow) === Math.abs(startCol - endCol)) {
+                const rowStep = endRow > startRow ? 1 : -1;
+                const colStep = endCol > startCol ? 1 : -1;
+                let row = startRow + rowStep;
+                let col = startCol + colStep;
+                while (row !== endRow) {
+                    if (board[row][col]) return false;
+                    row += rowStep;
+                    col += colStep;
+                }
+                return true;
+            }
+            break;
+        case 'q': // Queen
+            if (startRow === endRow || startCol === endCol || Math.abs(startRow - endRow) === Math.abs(startCol - endCol)) {
+                const rowStep = startRow === endRow ? 0 : (endRow > startRow ? 1 : -1);
+                const colStep = startCol === endCol ? 0 : (endCol > startCol ? 1 : -1);
+                let row = startRow + rowStep;
+                let col = startCol + colStep;
+                while (row !== endRow || col !== endCol) {
+                    if (board[row][col]) return false;
+                    row += rowStep;
+                    col += colStep;
+                }
+                return true;
+            }
+            break;
+        case 'k': // King
+            const dxk = Math.abs(startRow - endRow);
+            const dyk = Math.abs(startCol - endCol);
+            return dxk <= 1 && dyk <= 1;
+    }
+
+    return false;
+}
+
+setInterval(processMoveQueues, 100);
 
 function generateUniqueRoomCode() {
     let code;
@@ -27,14 +184,14 @@ function generateUniqueRoomCode() {
 
 function initialBoardState() {
     return [
-        ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'],
+        ['r', 'n', 'b', 'k', 'q', 'b', 'n', 'r'],
         ['p', 'p', 'p', 'p', 'p', 'p', 'p', 'p'],
         ['', '', '', '', '', '', '', ''],
         ['', '', '', '', '', '', '', ''],
         ['', '', '', '', '', '', '', ''],
         ['', '', '', '', '', '', '', ''],
         ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'],
-        ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R']
+        ['R', 'N', 'B', 'K', 'Q', 'B', 'N', 'R']
     ];
 }
 
@@ -76,7 +233,9 @@ io.on('connection', (socket) => {
             gameStarted: false,
             board: null,
             winner: null,
-            roomCode: roomCode
+            roomCode: roomCode,
+            moveQueue: {},
+            cooldowns: {}
         };
         socket.join(roomCode);
         console.log(`Room ${roomCode} created by ${data.username}`);
@@ -232,76 +391,77 @@ io.on('connection', (socket) => {
 
         if (room && room.gameStarted && !room.winner) {
             const { startRow, startCol, endRow, endCol } = move;
+            const pieceKey = `${startRow}-${startCol}`;
+            const piece = room.board[startRow][startCol];
 
-            // Validate move coordinates
-            if (
-                !Number.isInteger(startRow) || !Number.isInteger(startCol) ||
-                !Number.isInteger(endRow) || !Number.isInteger(endCol) ||
-                startRow < 0 || startRow > 7 || startCol < 0 || startCol > 7 ||
-                endRow < 0 || endRow > 7 || endCol < 0 || endCol > 7
-            ) {
-                socket.emit('moveError', 'Invalid move coordinates.');
-                return;
-            }
+            if (!piece) return;
 
-            const pieceToMove = room.board[startRow][startCol];
-
-            if (!pieceToMove) {
-                // This can happen with race conditions, it's not a critical error.
-                return;
-            }
-
-            if ((playerColor === 'white' && pieceToMove === pieceToMove.toLowerCase()) ||
-                (playerColor === 'black' && pieceToMove === pieceToMove.toUpperCase())) {
+            if ((playerColor === 'white' && piece === piece.toLowerCase()) ||
+                (playerColor === 'black' && piece === piece.toUpperCase())) {
                 socket.emit('moveError', 'You can only move your own pieces.');
                 return;
             }
 
-            room.board[endRow][endCol] = pieceToMove;
-            room.board[startRow][startCol] = '';
+            const now = Date.now();
+            const cooldown = room.cooldowns[pieceKey];
 
-            const winner = checkWinCondition(room.board);
-
-            if (winner) {
-                room.winner = winner;
-                room.players.forEach(p => {
-                    if (p.color === winner) {
-                        p.wins = (p.wins || 0) + 1;
-                    } else if (p.color !== 'spectator') {
-                        p.losses = (p.losses || 0) + 1;
-                    }
-                });
-
-                const playersPayload = JSON.parse(JSON.stringify(rooms[roomCode].players));
-                io.to(roomCode).emit('gameOver', { winner, board: room.board, players: playersPayload });
+            if (cooldown && now < cooldown) {
+                if (!room.moveQueue[pieceKey]) {
+                    room.moveQueue[pieceKey] = [];
+                }
+                room.moveQueue[pieceKey].push(move);
+                io.to(roomCode).emit('queueUpdated', room.moveQueue);
             } else {
-                io.to(roomCode).emit('moveMade', { move, board: room.board });
-                if (room.sharedCooldowns) {
-                    const pieceType = room.board[endRow][endCol].toLowerCase();
-                    const cooldown = room.customCooldowns[pieceType];
-                    io.to(roomCode).emit('cooldownUpdate', { piece: `${endRow}-${endCol}`, cooldown });
+                if (isValidMove(room.board, startRow, startCol, endRow, endCol)) {
+                    let pieceToMove = room.board[startRow][startCol];
+                    if (pieceToMove.toLowerCase() === 'p' && (endRow === 0 || endRow === 7)) {
+                        pieceToMove = (pieceToMove === 'P') ? 'Q' : 'q';
+                    }
+                    room.board[endRow][endCol] = pieceToMove;
+                    room.board[startRow][startCol] = '';
+
+                    const newPieceKey = `${endRow}-${endCol}`;
+                    const pieceType = piece.toLowerCase();
+                    const cooldownDuration = room.customCooldowns[pieceType] || pieceCooldowns[pieceType];
+                    if (cooldownDuration > 0) {
+                        room.cooldowns[newPieceKey] = now + cooldownDuration;
+                        io.to(roomCode).emit('cooldownsUpdated', room.cooldowns);
+                    }
+
+                    const winner = checkWinCondition(room.board);
+                    if (winner) {
+                        room.winner = winner;
+                        io.to(roomCode).emit('gameOver', { winner, board: room.board, players: room.players });
+                    } else {
+                        io.to(roomCode).emit('moveMade', { move, board: room.board });
+                    }
+                } else {
+                    socket.emit('moveError', 'Invalid move.');
                 }
             }
         }
     });
 
-    socket.on('resign', (data) => {
-        const { roomCode, playerColor } = data;
+    socket.on('reorderQueue', (data) => {
+        const { roomCode, pieceKey, previousIndex, currentIndex } = data;
         const room = rooms[roomCode];
-        if (room && room.gameStarted && !room.winner) {
-            const winnerColor = playerColor === 'white' ? 'black' : 'white';
-            room.winner = winnerColor;
+        if (room && room.moveQueue[pieceKey]) {
+            const queue = room.moveQueue[pieceKey];
+            const [movedItem] = queue.splice(previousIndex, 1);
+            queue.splice(currentIndex, 0, movedItem);
+            io.to(roomCode).emit('queueUpdated', room.moveQueue);
+        }
+    });
 
-            room.players.forEach(p => {
-                if (p.color === winnerColor) {
-                    p.wins = (p.wins || 0) + 1;
-                } else if (p.color === playerColor) {
-                    p.losses = (p.losses || 0) + 1;
-                }
-            });
-
-            const playersPayload = JSON.parse(JSON.stringify(rooms[roomCode].players));
-            io.to(roomCode).emit('gameOver', { winner: winnerColor, board: room.board, players: playersPayload });
+    socket.on('cancelFromQueue', (data) => {
+        const { roomCode, pieceKey, moveIndex } = data;
+        const room = rooms[roomCode];
+        if (room && room.moveQueue[pieceKey]) {
+            room.moveQueue[pieceKey].splice(moveIndex, 1);
+            if (room.moveQueue[pieceKey].length === 0) {
+                delete room.moveQueue[pieceKey];
+            }
+            io.to(roomCode).emit('queueUpdated', room.moveQueue);
         }
     });
 

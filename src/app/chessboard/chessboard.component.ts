@@ -1,4 +1,4 @@
-import { Component, HostListener, OnDestroy, Input, Output, EventEmitter } from '@angular/core';
+import { Component, HostListener, OnDestroy, Input, Output, EventEmitter, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { SocketService } from '../socket.service'; // Import SocketService
 
@@ -40,8 +40,6 @@ export class ChessboardComponent implements OnDestroy {
   isMoveCanceled: boolean = false; // New property
   cooldowns = new Map<string, number>();
   currentPieceIndex = 0;
-  cooldownInterval: any;
-  moveQueue = new Map<string, { endRow: number; endCol: number }[]>();
 
   pieceCooldowns: { [key: string]: number } = {
     p: 2000,
@@ -105,61 +103,31 @@ export class ChessboardComponent implements OnDestroy {
     }
   }
 
-  constructor(private socketService: SocketService) {
+  constructor(private socketService: SocketService, private zone: NgZone) {
     this.initializeBoard();
-    this.cooldownInterval = setInterval(() => {
-      this.processMoveQueue();
-    }, 100);
 
-    this.socketService.listen('cooldownUpdate').subscribe((data: { piece: string, cooldown: number }) => {
-      if (this.sharedCooldowns) {
-        const pieceType = data.piece.toLowerCase() as keyof typeof this.pieceCooldowns;
-        this.cooldowns.set(data.piece, Date.now() + data.cooldown);
-      }
+    this.socketService.listen('cooldownsUpdated').subscribe((cooldowns: any) => {
+      this.cooldowns = new Map(Object.entries(cooldowns));
     });
-  }
 
-  processMoveQueue() {
-    const now = Date.now();
-    for (const pieceKey of Array.from(this.moveQueue.keys())) {
-      const queue = this.moveQueue.get(pieceKey);
-      if (queue && queue.length > 0) {
-        const [row, col] = pieceKey.split('-').map(Number);
-        const cooldown = this.cooldowns.get(pieceKey);
-
-        if (!cooldown || cooldown < now) {
-          this.cooldowns.delete(pieceKey);
-          const move = queue.shift()!;
-          const piece = this.board[row][col];
-          if (piece) {
-            if (this.isValidMove(row, col, move.endRow, move.endCol)) {
-              this.move(row, col, move.endRow, move.endCol);
-              const newPieceKey = `${move.endRow}-${move.endCol}`;
-              if (queue.length > 0) {
-                this.moveQueue.set(newPieceKey, queue);
-              }
-              this.moveQueue.delete(pieceKey);
-            }
-          }
-        }
-      }
-    }
+    setInterval(() => {
+      this.zone.run(() => {});
+    }, 100);
   }
 
   ngOnDestroy() {
-    clearInterval(this.cooldownInterval);
   }
 
   initializeBoard() {
     this.board = [
-      ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'],
+      ['r', 'n', 'b', 'k', 'q', 'b', 'n', 'r'],
       ['p', 'p', 'p', 'p', 'p', 'p', 'p', 'p'],
       ['', '', '', '', '', '', '', ''],
       ['', '', '', '', '', '', '', ''],
       ['', '', '', '', '', '', '', ''],
       ['', '', '', '', '', '', '', ''],
       ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'],
-      ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R']
+      ['R', 'N', 'B', 'K', 'Q', 'B', 'N', 'R']
     ];
     this.turn = 'white'; // Still here, but not used for multiplayer logic
     this.cooldowns.clear();
@@ -170,18 +138,7 @@ export class ChessboardComponent implements OnDestroy {
 
     if (this.selectedPieces.length > 0) {
       const pieceToMove = this.selectedPieces[0];
-      const pieceKey = `${pieceToMove.row}-${pieceToMove.col}`;
-      const cooldown = this.cooldowns.get(pieceKey);
-
-      if (cooldown && cooldown > Date.now()) {
-        const queue = this.moveQueue.get(pieceKey) || [];
-        queue.push({ endRow: row, endCol: col });
-        this.moveQueue.set(pieceKey, queue);
-      } else {
-        if (this.isValidMove(pieceToMove.row, pieceToMove.col, row, col)) {
-          this.move(pieceToMove.row, pieceToMove.col, row, col);
-        }
-      }
+      this.move(pieceToMove.row, pieceToMove.col, row, col);
       this.selectedPieces = [];
     } else if (piece) {
       const isWhitePiece = piece === piece.toUpperCase();
@@ -397,92 +354,78 @@ export class ChessboardComponent implements OnDestroy {
   }
 
   move(startRow: number, startCol: number, endRow: number, endCol: number) {
-    let piece = this.board[startRow][startCol];
-    this.board[endRow][endCol] = piece;
-    this.board[startRow][startCol] = '';
-    this.reachedCell = { row: endRow, col: endCol };
-
-    if (piece.toLowerCase() === 'p') {
-      if ((piece === 'P' && endRow === 0) || (piece === 'p' && endRow === 7)) {
-        this.board[endRow][endCol] = (piece === 'P' ? 'Q' : 'q');
-      }
-    }
-
-    this.turn = 'white'; // No longer used for multiplayer logic
-    const cooldown = this.pieceCooldowns[piece.toLowerCase() as keyof typeof this.pieceCooldowns];
-    if (cooldown > 0) {
-      this.cooldowns.set(`${endRow}-${endCol}`, Date.now() + cooldown);
-    }
     this.moveMade.emit({ startRow, startCol, endRow, endCol });
   }
 
   updatePressPercentage() {
     if (this.pressTimer) {
-      const pressDuration = Date.now() - this.pressTimer;
-      this.pressPercentage = Math.min(100, (pressDuration / 2000) * 100);
+      this.zone.run(() => {
+        const pressDuration = Date.now() - this.pressTimer;
+        this.pressPercentage = Math.min(100, (pressDuration / 2000) * 100);
 
-      if (this.selectedPieces.length === 1) {
-        const { row, col, piece } = this.selectedPieces[0];
-        const pieceType = piece.toLowerCase();
-        let rowStep = 0;
-        let colStep = 0;
+        if (this.selectedPieces.length === 1) {
+          const { row, col, piece } = this.selectedPieces[0];
+          const pieceType = piece.toLowerCase();
+          let rowStep = 0;
+          let colStep = 0;
 
-        if (pieceType === 'n') {
-          const longPress = pressDuration > 1000;
-          let newRow1: number | undefined = undefined;
-          let newCol1: number | undefined = undefined;
-          let newRow2: number | undefined = undefined;
-          let newCol2: number | undefined = undefined;
+          if (pieceType === 'n') {
+            const longPress = pressDuration > 1000;
+            let newRow1: number | undefined = undefined;
+            let newCol1: number | undefined = undefined;
+            let newRow2: number | undefined = undefined;
+            let newCol2: number | undefined = undefined;
 
-          switch (this.numpadDirection) {
-            case 1: newRow1 = row + 1; newCol1 = col - 2; newRow2 = row + 2; newCol2 = col - 1; break;
-            case 2: newRow1 = row + 2; newCol1 = col - 1; newRow2 = row + 2; newCol2 = col + 1; break;
-            case 3: newRow1 = row + 1; newCol1 = col + 2; newRow2 = row + 2; newCol2 = col + 1; break;
-            case 4: newRow1 = row - 1; newCol1 = col - 2; newRow2 = row + 1; newCol2 = col - 2; break;
-            case 6: newRow1 = row - 1; newCol1 = col + 2; newRow2 = row + 1; newCol2 = col + 2; break;
-            case 7: newRow1 = row - 1; newCol1 = col - 2; newRow2 = row - 2; newCol2 = col - 1; break;
-            case 8: newRow1 = row - 2; newCol1 = col - 1; newRow2 = row - 2; newCol2 = col + 1; break;
-            case 9: newRow1 = row - 1; newCol1 = col + 2; newRow2 = row - 2; newCol2 = col + 1; break;
-          }
-
-          if (newRow1 !== undefined && newCol1 !== undefined && newRow2 !== undefined && newCol2 !== undefined) {
-            this.landingCell = longPress ? { row: newRow2, col: newCol2 } : { row: newRow1, col: newCol1 };
-          }
-
-        } else {
-          switch (this.numpadDirection) {
-            case 1: rowStep = 1; colStep = -1; break;
-            case 2: rowStep = 1; break;
-            case 3: rowStep = 1; colStep = 1; break;
-            case 4: colStep = -1; break;
-            case 6: colStep = 1; break;
-            case 7: rowStep = -1; colStep = -1; break;
-            case 8: rowStep = -1; break;
-            case 9: rowStep = -1; colStep = 1; break;
-          }
-
-          const distance = Math.floor(pressDuration / 500) + 1;
-          let newRow = row;
-          let newCol = col;
-          for (let i = 0; i < distance; i++) {
-            const tempRow = newRow + rowStep;
-            const tempCol = newCol + colStep;
-            if (this.isValidMove(row, col, tempRow, tempCol)) {
-              newRow = tempRow;
-              newCol = tempCol;
-            } else {
-              break;
+            switch (this.numpadDirection) {
+              case 1: newRow1 = row + 1; newCol1 = col - 2; newRow2 = row + 2; newCol2 = col - 1; break;
+              case 2: newRow1 = row + 2; newCol1 = col - 1; newRow2 = row + 2; newCol2 = col + 1; break;
+              case 3: newRow1 = row + 1; newCol1 = col + 2; newRow2 = row + 2; newCol2 = col + 1; break;
+              case 4: newRow1 = row - 1; newCol1 = col - 2; newRow2 = row + 1; newCol2 = col - 2; break;
+              case 6: newRow1 = row - 1; newCol1 = col + 2; newRow2 = row + 1; newCol2 = col + 2; break;
+              case 7: newRow1 = row - 1; newCol1 = col - 2; newRow2 = row - 2; newCol2 = col - 1; break;
+              case 8: newRow1 = row - 2; newCol1 = col - 1; newRow2 = row - 2; newCol2 = col + 1; break;
+              case 9: newRow1 = row - 1; newCol1 = col + 2; newRow2 = row - 2; newCol2 = col + 1; break;
             }
-          }
-          this.landingCell = { row: newRow, col: newCol };
-        }
 
-        // Check legality of the landing cell
-        if (this.selectedPieces.length > 0 && this.landingCell) {
-          const { row: startR, col: startC } = this.selectedPieces[0];
-          this.isLandingMoveLegal = this.isValidMove(startR, startC, this.landingCell.row, this.landingCell.col);
+            if (newRow1 !== undefined && newCol1 !== undefined && newRow2 !== undefined && newCol2 !== undefined) {
+              this.landingCell = longPress ? { row: newRow2, col: newCol2 } : { row: newRow1, col: newCol1 };
+            }
+
+          } else {
+            switch (this.numpadDirection) {
+              case 1: rowStep = 1; colStep = -1; break;
+              case 2: rowStep = 1; break;
+              case 3: rowStep = 1; colStep = 1; break;
+              case 4: colStep = -1; break;
+              case 6: colStep = 1; break;
+              case 7: rowStep = -1; colStep = -1; break;
+              case 8: rowStep = -1; break;
+              case 9: rowStep = -1; colStep = 1; break;
+            }
+
+            const distance = Math.floor(pressDuration / 500) + 1;
+            let newRow = row;
+            let newCol = col;
+            for (let i = 0; i < distance; i++) {
+              const tempRow = newRow + rowStep;
+              const tempCol = newCol + colStep;
+              if (this.isValidMove(row, col, tempRow, tempCol)) {
+                newRow = tempRow;
+                newCol = tempCol;
+              } else {
+                break;
+              }
+            }
+            this.landingCell = { row: newRow, col: newCol };
+          }
+
+          // Check legality of the landing cell
+          if (this.selectedPieces.length > 0 && this.landingCell) {
+            const { row: startR, col: startC } = this.selectedPieces[0];
+            this.isLandingMoveLegal = this.isValidMove(startR, startC, this.landingCell.row, this.landingCell.col);
+          }
         }
-      }
+      });
 
       requestAnimationFrame(() => this.updatePressPercentage());
     }
@@ -582,4 +525,8 @@ export class ChessboardComponent implements OnDestroy {
     this.selectedPieces = [];
     setTimeout(() => this.reachedCell = null, 1000);
   }
+
+
+
+
 }

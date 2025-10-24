@@ -1,0 +1,176 @@
+﻿________________
+
+
+Final Document: Vim/Chess Control and Rules (Pipeline Logic with Parametric Macros)
+
+
+
+
+1. Introduction and Control Philosophy
+
+
+This document defines the control system for a hybrid strategy game that merges the logic of chess with the command-based control philosophy of Vim, set in a real-time, cooldown-governed environment.
+Interaction is handled via a Command Mode (:), where a single line of text, defined as a Pipeline, programs a complex sequence of moves. The philosophy is built on three core pillars:
+1. Sequential Pipeline (|): The command is a sequence of Action Blocks (AZ). Execution is strictly sequential, from left to right.
+2. The Consumption Rule (Cooldown): A piece that successfully executes an action is immediately consumed—it enters a cooldown state and is removed from the set of active pieces for the remainder of the Pipeline.
+3. Parametric Macros (@): Complex strategies and recurring commands can be saved as macros that accept parameters, allowing for flexible tactical execution via simple aliases.
+________________
+
+
+2. Command Syntax
+
+
+Every command is a Pipeline composed of one or more Action Blocks (AZ), separated by the | symbol.
+:[AZ_1] | [AZ_2] | [AZ_3] …
+
+
+Structure of an Action Block (AZ)
+
+
+Each block defines which pieces act and what action they perform, using a filter and an action separated by the -> operator.
+[Selection Filter] -> [Main Action]
+* The Filter selects a subset of the currently active pieces. If omitted, * is used to denote "all active pieces".
+* The Action defines the movement or command to be executed.
+________________
+
+
+3. Naming Conventions and Aliases
+
+
+To ensure a fast and readable syntax, the following aliases are used:
+Original Command
+	Final Alias
+	Description
+	max_cap(...)
+	>(...)
+	Move the maximum legal distance and capture the first enemy piece encountered.
+	max_free(...)
+	>!(...)
+	Move the maximum legal distance, stopping one square before any obstruction (no capture).
+	diag(...)
+	d(...)
+	Diagonal movement.
+	to(...)
+	t(...)
+	Move to a specific square.
+	promo(...)
+	pr(...)
+	Promote a pawn.
+	pawn, rook...
+	p, r, n, b, q, k
+	Abbreviations for pieces.
+	________________
+
+
+4. Advanced Selection Logic (Filters)
+
+
+Filters precisely define the group of pieces an action applies to. To create complex selections, multiple filters can be combined using logical operators. Such combinations must be enclosed in parentheses ().
+Logical Operator
+	Symbol / Word
+	Name
+	Syntax (Example)
+	Description
+	Union
+	| or OR
+	orOR`
+	Union
+	`:(p
+	Intersection
+	& or AND
+	Intersection
+	:(b & row5)
+	Selects only pieces that are Bishops AND are on rank 5.
+	Difference
+	! or NOT
+	Difference
+	:(* ! p)
+	Selects all pieces EXCEPT Pawns.
+	Range/Logic
+	N/A
+	Range/Logic
+	:row[2-7], :col%2=0, :col<D
+	Selects pieces in ranges or according to logical criteria.
+	________________
+
+
+5. Actions and Special Rules
+
+
+
+
+Implicit Capture
+
+
+There is no eat command. A capture is an implicit result of a move. If an action ends on a square occupied by an enemy piece, the enemy piece is captured, and the move is successful.
+
+
+Exception: The Promotion Command pr(...)
+
+
+The promotion command is the sole exception to the consumption rule.
+* pr(...) does not trigger a cooldown. A pawn that successfully executes a promotion action remains active and can therefore perform another action in a subsequent block of the same Pipeline, but now as its new piece type (e.g., a Queen).
+________________
+
+
+6. Priority Rules (Order of Determination)
+
+
+When an action is legally valid for multiple active pieces, the conflict is resolved by a strict priority order. Only the highest-priority piece moves; for all others, the action fails, and they remain active for subsequent blocks.
+1. Capture Priority: Moves that result in a capture always take precedence over moves to an empty square.
+2. Positional Priority: If capture priority is equal, precedence is given based on the piece's position relative to the direction of movement (e.g., most advanced rank, leftmost file).
+________________
+
+
+7. Templates and Parametric Macros
+
+
+To automate complex strategies and repetitive commands, you can define and import custom macros that accept parameters.
+
+
+Macro Definition
+
+
+Macros are defined in an external file (e.g., my_game.vcmacros) that is imported at the start of a match. Parameters within the definition are denoted by $1, $2, etc.
+Definition Syntax:
+@define <macro_name> "[pipeline_command_with_$1_and_$2]"
+Example .vcmacros file:
+
+
+
+
+
+
+# Simple macro with no parameters
+@define knights_out ":n -> t(c3) | :n -> t(f3)"
+
+# Parametric macro to move a specific piece type to a target square
+# $1: piece type (e.g., n, b, r)
+# $2: destination square (e.g., e4)
+@define move_to ":$1 -> t($2)"
+
+# Parametric macro for a coordinated attack
+# $1: primary attacking piece
+# $2: attack square
+# $3: support piece
+# $4: positioning square for the support
+@define assault ":$1 -> >($2) | :$3 -> t($4)"
+
+
+
+Macro Usage
+
+
+Once imported, macros can be invoked in Command Mode. If the macro accepts parameters, they are passed in parentheses, separated by a comma.
+Invocation Syntax:
+:@macro_name(param1, param2, ...)
+In-Game Usage Examples:
+1. Rapid knight development (simple macro):
+:@knights_out
+   * Result: The system executes :n -> t(c3) | :n -> t(f3).
+   2. Move the Bishop to d3 (parametric macro):
+:@move_to(b, d3)
+      * Result: The system replaces $1 with b and $2 with d3, executing :b -> t(d3).
+      3. Launch an assault (complex parametric macro):
+:@assault(q, g7, r, d1)
+         * Result: The system executes :q -> >>(g7) | :r -> t(d1). The Queen attacks g7, and the Rook positions itself on d1 for support.

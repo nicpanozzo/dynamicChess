@@ -3,16 +3,19 @@ import { Subscription } from 'rxjs';
 import { ActivatedRoute, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { ChessboardComponent } from '../chessboard/chessboard.component';
+import { MoveQueueComponent } from './move-queue/move-queue.component';
 import { SocketService } from '../socket.service';
 
 @Component({
   selector: 'app-game',
   standalone: true,
-  imports: [CommonModule, ChessboardComponent],
+  imports: [CommonModule, ChessboardComponent, MoveQueueComponent],
   templateUrl: './game.component.html',
   styleUrls: ['./game.component.css']
 })
 export class GameComponent implements OnInit, AfterViewInit, OnDestroy {
+  public showCommands = false;
+
   @ViewChild(ChessboardComponent) chessboard!: ChessboardComponent;
 
   roomCode: string | null = null;
@@ -24,6 +27,7 @@ export class GameComponent implements OnInit, AfterViewInit, OnDestroy {
   playerLosses: number = 0;
   customCooldowns: { [key: string]: number } | null = null;
   sharedCooldowns: boolean = false;
+  moveQueue: Map<string, { endRow: number; endCol: number }[]> = new Map();
 
   private initialBoard: string[][] | null = null;
   private initialPlayers: any[] | null = null;
@@ -43,14 +47,13 @@ export class GameComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnInit() {
-    this.route.queryParams.subscribe(params => {
-      this.roomCode = params['room'];
-      this.playerColor = params['color'];
-      if (params['customCooldowns']) {
-        this.customCooldowns = JSON.parse(params['customCooldowns']);
-      }
-      this.sharedCooldowns = params['sharedCooldowns'] === 'true';
-    });
+    this.roomCode = this.route.snapshot.queryParams['room'];
+    this.playerColor = this.route.snapshot.queryParams['color'];
+    const customCooldownsParam = this.route.snapshot.queryParams['customCooldowns'];
+    if (customCooldownsParam) {
+      this.customCooldowns = JSON.parse(customCooldownsParam);
+    }
+    this.sharedCooldowns = this.route.snapshot.queryParams['sharedCooldowns'] === 'true';
 
     if (this.initialPlayers) {
         const opponent = this.initialPlayers.find(p => p.color !== this.playerColor);
@@ -97,6 +100,12 @@ export class GameComponent implements OnInit, AfterViewInit, OnDestroy {
         alert(`Move Error: ${message}`);
       });
     }));
+
+    this.subscriptions.add(this.socketService.listen('queueUpdated').subscribe((queue: any) => {
+      this.zone.run(() => {
+        this.moveQueue = new Map(Object.entries(queue));
+      });
+    }));
   }
 
   ngOnDestroy() {
@@ -124,6 +133,8 @@ export class GameComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+
+
   resign() {
     if (confirm('Are you sure you want to resign?')) {
       this.socketService.emit('resign', { roomCode: this.roomCode, playerColor: this.playerColor });
@@ -138,5 +149,19 @@ export class GameComponent implements OnInit, AfterViewInit, OnDestroy {
     this.socketService.disconnect();
     this.router.navigate(['/']);
   }
+
+  onMoveReordered(event: { pieceKey: string, previousIndex: number, currentIndex: number }) {
+    if (this.roomCode) {
+      this.socketService.emit('reorderQueue', { ...event, roomCode: this.roomCode });
+    }
+  }
+
+  onMoveCancelled(event: { pieceKey: string, moveIndex: number }) {
+    if (this.roomCode) {
+      this.socketService.emit('cancelFromQueue', { ...event, roomCode: this.roomCode });
+    }
+  }
+
+
 
 }

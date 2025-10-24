@@ -149,4 +149,5 @@ p {
   box-shadow: 5px 5px 10px #a3b1c6, -5px -5px 10px #ffffff;
   transition: all 0.2s ease-in-out;
   margin-left: 10px;
+  margin-bottom: 20px;
 }

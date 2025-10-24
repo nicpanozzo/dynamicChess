@@ -1,17 +1,18 @@
+:host {
+  display: block;
+  width: 520px;
+  height: 520px;
+}
+
 .chessboard-container {
   border-radius: 20px;
   background: #e0e5ec;
   box-shadow: 9px 9px 16px #a3b1c6, -9px -9px 16px #ffffff;
   padding: 20px;
   transition: transform 0.5s ease-in-out;
-  transform: rotate(90deg);
 }
 
 .chessboard-container.rotated {
-  transform: rotate(270deg);
-}
-
-.chessboard-container.rotated .board-cell {
   transform: rotate(180deg);
 }
 
@@ -47,7 +48,6 @@
 .piece {
   font-family: 'Material Symbols Outlined';
   font-variation-settings: 'FILL' 1;
-  transform: rotate(-90deg);
 }
 
 .white-piece {
@@ -58,6 +58,14 @@
 .black-piece {
   color: #333;
   text-shadow: 1px 1px 2px #ffffff;
+}
+
+.chessboard-container.rotated .piece {
+  transform: rotate(180deg);
+}
+
+.chessboard-container.rotated .cooldown-text {
+  transform: rotate(180deg);
 }
 
 .selected {
@@ -95,5 +103,4 @@
   font-weight: 600;
   font-size: 1.5em;
   text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5);
-  transform: rotate(-90deg);
 }

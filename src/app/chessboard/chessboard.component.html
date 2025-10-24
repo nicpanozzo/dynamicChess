@@ -1,14 +1,14 @@
 <div class="chessboard-container" [class.rotated]="playerColor === 'black'">
   <div class="chessboard">
-    <div *ngFor="let row of board; let i = index" class="board-row">
+    <ng-container *ngFor="let row of board; let i = index">
       <div *ngFor="let piece of row; let j = index"
            class="board-cell"
            [class.selected]="isSelected(i, j)"
            [class.reached]="isReached(i, j)"
            [class.landing]="isLanding(i, j)"
            [class.illegal-landing]="isIllegalLanding(i, j)"
-           [class.light-bg]="(i + j) % 2 === 0"
-           [class.dark-bg]="(i + j) % 2 !== 0"
+           [class.dark-bg]="(i + j) % 2 === 0"
+           [class.light-bg]="(i + j) % 2 !== 0"
            (click)="onCellClick(i, j)">
         <div *ngIf="piece" class="piece" [class.white-piece]="piece === piece.toUpperCase()" [class.black-piece]="piece === piece.toLowerCase()">{{ getPieceSymbol(piece) }}</div>
         <div *ngIf="getCooldownTimeLeft(i, j) > 0" class="cooldown-overlay"
@@ -16,6 +16,6 @@
           <span class="cooldown-text">{{ getCooldownTimeLeft(i, j) }}s</span>
         </div>
       </div>
-    </div>
+    </ng-container>
   </div>
 </div>
