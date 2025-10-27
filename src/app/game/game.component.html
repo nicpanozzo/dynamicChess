@@ -41,13 +41,28 @@
 
   <div class="commands" *ngIf="showCommands">
     <h3>Commands</h3>
+    <h4>Filters (Piece Selection)</h4>
     <ul>
-      <li><strong>Piece Selection:</strong> Press the key corresponding to the piece type (e.g., 'p' for pawn, 'r' for rook).</li>
-      <li><strong>Select All Pieces:</strong> Hold Shift and press the piece key to select all pieces of that type.</li>
-      <li><strong>Cycle Through Pieces:</strong> Press the piece key repeatedly to cycle through all pieces of that type.</li>
-      <li><strong>Move Direction:</strong> Use the numpad keys (1-9, excluding 5) to set the direction of the move.</li>
-      <li><strong>Move Distance:</strong> Hold the numpad key to increase the move distance (for sliders).</li>
-      <li><strong>Cancel Move:</strong> Press '5' on the numpad while holding a direction key to cancel the move.</li>
+      <li><strong>Piece Type:</strong> `p`, `r`, `n`, `b`, `q`, `k` (e.g., `p->a3` for pawn to a3)</li>
+      <li><strong>Rank:</strong> `1` to `8` (e.g., `2->a3` for any piece on rank 2 to a3)</li>
+      <li><strong>File:</strong> `A` to `H` (e.g., `A->a3` for any piece on file A to a3)</li>
+      <li><strong>All Pieces:</strong> `*` (e.g., `*->a3` for any piece to a3)</li>
+      <li><strong>Combine Filters:</strong> Use `&` (AND) and `|` (OR) (e.g., `p&A->a3` for pawns on file A to a3)</li>
+    </ul>
+    <h4>Actions (Movement)</h4>
+    <ul>
+      <li><strong>Move to Square:</strong> `d4` (e.g., `p->d4`)</li>
+      <li><strong>Multiple Moves:</strong> Use `|` (OR) (e.g., `p->d4|e4` for pawn to d4 or e4)</li>
+      <li><strong>Append to Queue:</strong> Use `&` before the action (e.g., `p->&d4` to add move to queue)</li>
+      <li><strong>Clear Queue:</strong> `X` (e.g., `p->X` to clear all queued moves for pawns)</li>
+    </ul>
+    <h4>Examples</h4>
+    <ul>
+      <li>`p->a3`: Move a pawn to a3.</li>
+      <li>`r&B->d4`: Move a rook on file B to d4.</li>
+      <li>`n->&b1|&d2`: Append moves for knights to b1 or d2.</li>
+      <li>`*->X`: Clear all queues for all pieces.</li>
+      <li>`p->X|c3`: Clear all queues for pawns, then move a pawn to c3.</li>
     </ul>
   </div>
 

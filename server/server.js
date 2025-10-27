@@ -82,6 +82,7 @@ function getCoordsFromKey(key) {
 }
 
 function isValidMove(board, startRow, startCol, endRow, endCol) {
+    console.log('isValidMove called with:', { board, startRow, startCol, endRow, endCol });
     const piece = board[startRow][startCol];
     if (!piece) return false;
     const targetPiece = board[endRow][endCol];
@@ -526,317 +527,144 @@ app.get('*', (req, res) => {
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
-function parseAndExecuteCommand(room, command, socket) {
-
-    const [filterStr, actionStr] = command.split('->');
-
-    if (!filterStr || !actionStr) {
-
-        socket.emit('commandError', 'Invalid command format. Use filter->action.');
-
-        return;
-
-    }
-
-
-
-    const filter = filterStr.trim();
-
-    let action = actionStr.trim();
-
-    let appendToQueue = false;
-
-
-
-    if (action.startsWith('&')) {
-
-        appendToQueue = true;
-
-        action = action.substring(1).trim(); // Remove '&'
-
-    }
-
-
-
-    const targetCoords = parseSquare(action);
-
-    if (!targetCoords) {
-
-        socket.emit('commandError', 'Invalid target square.');
-
-        return;
-
-    }
-
-    const { endRow, endCol } = targetCoords;
-
-
-
-            const pieces = findPieces(room.board, filter, socket.id, room.players);
-
-
-
-            let commandExecuted = false;
-
-
-
-            let commandQueued = false;
-
-
-
-            let commandFailedDueToCooldown = false;
-
-
-
-            let commandFailedDueToInvalidMove = false; // New flag
-
-
-
-        
-
-
-
-            for (const piece of pieces) {
-
-
-
-                const { row: startRow, col: startCol } = piece;
-
-
-
-                const pieceKey = `${startRow}-${startCol}`;
-
-
-
-                const now = Date.now();
-
-
-
-                const cooldown = room.cooldowns[pieceKey];
-
-
-
-        
-
-
-
-                const isCoolingDown = cooldown && now < cooldown;
-
-
-
-        
-
-
-
-                // Check move validity only if not appending to queue
-
-
-
-                const moveIsValid = isValidMove(room.board, startRow, startCol, endRow, endCol);
-
-
-
-        
-
-
-
-                if (isCoolingDown) {
-
-
-
-                    if (appendToQueue) {
-
-
-
-                        // Add to queue even if invalid
-
-
-
-                        if (!room.moveQueue[pieceKey]) {
-
-
-
-                            room.moveQueue[pieceKey] = [];
-
-
-
-                        }
-
-
-
-                        room.moveQueue[pieceKey].push({ startRow, startCol, endRow, endCol });
-
-
-
-                        commandQueued = true;
-
-
-
-                    } else {
-
-
-
-                        commandFailedDueToCooldown = true;
-
-
-
-                    }
-
-
-
-                } else { // No cooldown, or cooldown expired
-
-
-
-                    if (moveIsValid) {
-
-
-
-                        // Execute move directly
-
-
-
-                        let pieceToMove = room.board[startRow][startCol];
-
-
-
-                        if (pieceToMove.toLowerCase() === 'p' && (endRow === 0 || endRow === 7)) {
-
-
-
-                            pieceToMove = (pieceToMove === 'P') ? 'Q' : 'q';
-
-
-
-                        }
-
-
-
-                        room.board[endRow][endCol] = pieceToMove;
-
-
-
-                        room.board[startRow][startCol] = '';
-
-
-
-        
-
-
-
-                        const newPieceKey = `${endRow}-${endCol}`;
-
-
-
-                        const cooldownDuration = room.customCooldowns[piece.piece.toLowerCase()] || pieceCooldowns[piece.piece.toLowerCase()];
-
-
-
-                        if (cooldownDuration > 0) {
-
-
-
-                            room.cooldowns[newPieceKey] = now + cooldownDuration;
-
-
-
-                            io.to(room.roomCode).emit('cooldownsUpdated', room.cooldowns);
-
-
-
-                        }
-
-
-
-        
-
-
-
-                        io.to(room.roomCode).emit('moveMade', { move: { startRow, startCol, endRow, endCol }, board: room.board });
-
-
-
-                        commandExecuted = true;
-
-
-
-                    } else {
-
-
-
-                        commandFailedDueToInvalidMove = true;
-
-
-
-                    }
-
-
-
-                }
-
-
-
-            }
-
-
-
-        
-
-
-
-            // Emit feedback after the loop
-
-
-
-            if (commandExecuted) {
-
-
-
-                socket.emit('commandSuccess', 'Command executed successfully.');
-
-
-
-            } else if (commandQueued) {
-
-
-
-                socket.emit('commandSuccess', 'Moves added to queue (some may be invalid).');
-
-
-
-                io.to(room.roomCode).emit('queueUpdated', room.moveQueue);
-
-
-
-            } else if (commandFailedDueToCooldown) {
-
-
-
-                socket.emit('commandError', 'Some pieces are on cooldown. Use & to append to queue.');
-
-
-
-            } else if (commandFailedDueToInvalidMove) {
-
-
-
-                socket.emit('commandError', 'No valid move found for the given command (some moves were invalid).');
-
-
-
+function parseAction(actionStr) {
+    const targetActions = actionStr.split('|').map(s => s.trim());
+    const actionList = [];
+    for (const action of targetActions) {
+        let appendToQueue = false;
+        let actionToParse = action;
+
+        if (action.startsWith('&')) {
+            appendToQueue = true;
+            actionToParse = action.substring(1).trim();
+        }
+
+        if (actionToParse.toUpperCase() === 'X') { // Check for 'X' action
+            actionList.push({ actionType: 'clearQueue', appendToQueue });
+        } else {
+            const coords = parseSquare(actionToParse);
+            if (coords) {
+                actionList.push({ actionType: 'move', ...coords, appendToQueue });
             } else {
-
-
-
-                socket.emit('commandError', 'No pieces found matching the filter or no valid moves.');
-
-
-
+                return null; // Invalid square in the list
             }
-
+        }
+    }
+    return actionList;
 }
 
-function parseSquare(square) {
+function parseAndExecuteCommand(room, command, socket) {
+    const [filterStr, originalActionStr] = command.split('->');
+    if (!filterStr || !originalActionStr) {
+        socket.emit('commandError', 'Invalid command format. Use filter->action.');
+        return;
+    }
+
+    const filter = parseFilter(filterStr.trim());
+    if (!filter) {
+        socket.emit('commandError', 'Invalid filter format.');
+        return;
+    }
+
+    let actionToParse = originalActionStr.trim();
+
+    const actionList = parseAction(actionToParse);
+    if (!actionList || actionList.length === 0) {
+        socket.emit('commandError', 'Invalid target square(s).');
+        return;
+    }
+
+    const pieces = findPieces(room.board, filter, socket.id, room.players);
+    let commandExecuted = false;
+    let commandQueued = false;
+    let commandFailedDueToCooldown = false;
+    let commandFailedDueToInvalidMove = false; // New flag
+
+    for (const piece of pieces) {
+        const { row: startRow, col: startCol } = piece;
+        const pieceKey = `${startRow}-${startCol}`;
+        const now = Date.now();
+        const cooldown = room.cooldowns[pieceKey];
+
+        const isCoolingDown = cooldown && now < cooldown;
+
+        let pieceHandledThisTurn = false; // Flag to track if this piece has been handled (moved or queued)
+
+        for (const actionObj of actionList) {
+            const { actionType, endRow, endCol, appendToQueue: actionAppendToQueue } = actionObj;
+
+            if (actionType === 'clearQueue') {
+                delete room.moveQueue[pieceKey];
+                commandExecuted = true;
+                pieceHandledThisTurn = true;
+                io.to(room.roomCode).emit('queueUpdated', room.moveQueue);
+                // Do not break, continue to process other actions for this piece
+            } else if (actionType === 'move') { // Only process move actions here
+                const moveIsValid = isValidMove(room.board, startRow, startCol, endRow, endCol);
+
+                if (isCoolingDown) {
+                    if (actionAppendToQueue) {
+                        if (!room.moveQueue[pieceKey]) {
+                            room.moveQueue[pieceKey] = [];
+                        }
+                        room.moveQueue[pieceKey].push({ startRow, startCol, endRow, endCol });
+                        commandQueued = true;
+                        pieceHandledThisTurn = true;
+                        // Continue to next actionObj for this piece
+                    } else {
+                        commandFailedDueToCooldown = true;
+                        // Continue to next actionObj for this piece
+                    }
+                } else { // No cooldown, or cooldown expired
+                    if (moveIsValid) {
+                        // Execute move directly
+                        let pieceToMove = room.board[startRow][startCol];
+                        if (pieceToMove.toLowerCase() === 'p' && (endRow === 0 || endRow === 7)) {
+                            pieceToMove = (pieceToMove === 'P') ? 'Q' : 'q';
+                        }
+                        room.board[endRow][endCol] = pieceToMove;
+                        room.board[startRow][startCol] = '';
+
+                        const newPieceKey = `${endRow}-${endCol}`;
+                        const cooldownDuration = room.customCooldowns[piece.piece.toLowerCase()] || pieceCooldowns[piece.piece.toLowerCase()];
+                        if (cooldownDuration > 0) {
+                            room.cooldowns[newPieceKey] = now + cooldownDuration;
+                            io.to(room.roomCode).emit('cooldownsUpdated', room.cooldowns);
+                        }
+
+                        io.to(room.roomCode).emit('moveMade', { move: { startRow, startCol, endRow, endCol }, board: room.board });
+                        commandExecuted = true;
+                        pieceHandledThisTurn = true;
+                        if (!actionAppendToQueue) { // If not appending, break after first successful move
+                            break;
+                        }
+                    } else {
+                        commandFailedDueToInvalidMove = true;
+                        // Continue to next actionObj for this piece
+                    }
+                }
+            }
+        }
+    }
+
+    // Emit feedback after the loop
+    if (commandExecuted) {
+        socket.emit('commandSuccess', 'Command executed successfully.');
+    } else if (commandQueued) {
+        socket.emit('commandSuccess', 'Moves added to queue (some may be invalid).');
+        io.to(room.roomCode).emit('queueUpdated', room.moveQueue);
+    } else if (commandFailedDueToCooldown) {
+        socket.emit('commandError', 'Some pieces are on cooldown. Use & to append to queue.');
+    } else if (commandFailedDueToInvalidMove) {
+        socket.emit('commandError', 'No valid move found for the given command (some moves were invalid).');
+    } else {
+        socket.emit('commandError', 'No pieces found matching the filter or no valid moves.');
+    }
+}
+
+    
+
+    function parseSquare(square) {
     if (square.length !== 2) return null;
     const file = square[0].toLowerCase();
     const rank = parseInt(square[1], 10);
@@ -847,14 +675,11 @@ function parseSquare(square) {
     return { endRow, endCol };
 }
 
-function findPieces(board, filter, playerId, players) {
+function findPieces(board, parsedFilter, playerId, players) {
     const player = players.find(p => p.id === playerId);
     if (!player) return [];
 
     const pieces = [];
-    const isRankFilter = /^[1-8]$/.test(filter);
-    const rankToFilter = isRankFilter ? 8 - parseInt(filter, 10) : -1;
-
     for (let i = 0; i < 8; i++) {
         for (let j = 0; j < 8; j++) {
             const piece = board[i][j];
@@ -864,17 +689,77 @@ function findPieces(board, filter, playerId, players) {
             const isPlayerPiece = (player.color === 'white' && isWhitePiece) || (player.color === 'black' && !isWhitePiece);
 
             if (isPlayerPiece) {
-                if (isRankFilter) {
-                    if (i === rankToFilter) {
-                        pieces.push({ row: i, col: j, piece });
-                    }
-                } else { // piece type filter
-                    if (piece.toLowerCase() === filter) {
-                        pieces.push({ row: i, col: j, piece });
-                    }
+                console.log('Piece before evaluateFilter:', piece);
+                if (evaluateFilter({ piece, row: i, col: j }, i, j, parsedFilter)) {
+                    pieces.push({ row: i, col: j, piece });
                 }
             }
         }
     }
     return pieces;
+}
+
+function parseFilter(filterStr) {
+    // This is a simplified recursive descent parser for filters
+    let i = 0;
+
+    function parseTerm() {
+        let token = '';
+        while (i < filterStr.length && !['&', '|', '(', ')'].includes(filterStr[i])) {
+            token += filterStr[i];
+            i++;
+        }
+        token = token.trim();
+
+        const isRankFilter = /^[1-8]$/.test(token);
+        const isFileFilter = /^[a-hA-H]$/.test(token);
+
+        if (isRankFilter) {
+            return { type: 'rank', value: 8 - parseInt(token, 10) };
+        } else if (isFileFilter) {
+            return { type: 'file', value: token.toLowerCase() };
+        } else if (['p', 'r', 'n', 'b', 'q', 'k'].includes(token.toLowerCase())) {
+            return { type: 'piece', value: token.toLowerCase() };
+        } else if (token === '*' ) {
+            return { type: 'all' };
+        }
+        return null;
+    }
+
+    function parseExpression() {
+        let left = parseTerm();
+        if (!left) return null;
+
+        while (i < filterStr.length && ['&', '|'].includes(filterStr[i])) {
+            const operator = filterStr[i];
+            i++;
+            const right = parseTerm();
+            if (!right) return null;
+            left = { type: operator === '&' ? 'AND' : 'OR', left, right };
+        }
+        return left;
+    }
+
+    return parseExpression();
+}
+
+function evaluateFilter(pieceObj, row, col, filter) {
+    if (!filter) return false;
+
+    switch (filter.type) {
+        case 'piece':
+            return pieceObj.piece.toLowerCase() === filter.value;
+        case 'rank':
+            return row === filter.value;
+        case 'file':
+            return col === (filter.value.charCodeAt(0) - 'a'.charCodeAt(0));
+        case 'all':
+            return true;
+        case 'AND':
+            return evaluateFilter(pieceObj, row, col, filter.left) && evaluateFilter(pieceObj, row, col, filter.right);
+        case 'OR':
+            return evaluateFilter(pieceObj, row, col, filter.left) || evaluateFilter(pieceObj, row, col, filter.right);
+        default:
+            return false;
+    }
 }
