@@ -68,6 +68,44 @@
   gap: 20px;
 }
 
+.command-input-container {
+  display: flex;
+  margin-top: 20px;
+  width: 100%;
+  max-width: 600px;
+}
+
+.command-input-container input {
+  flex-grow: 1;
+  padding: 10px 15px;
+  border: none;
+  border-radius: 10px 0 0 10px;
+  background: #e0e5ec;
+  box-shadow: inset 5px 5px 10px #a3b1c6, inset -5px -5px 10px #ffffff;
+  color: #333;
+  font-family: 'Poppins', sans-serif;
+}
+
+.command-input-container button {
+  padding: 10px 15px;
+  border: none;
+  border-radius: 0 10px 10px 0;
+  background: #e0e5ec;
+  color: #333;
+  cursor: pointer;
+  font-weight: 600;
+  box-shadow: 5px 5px 10px #a3b1c6, -5px -5px 10px #ffffff;
+  transition: all 0.2s ease-in-out;
+}
+
+.command-input-container button:hover {
+  box-shadow: 2px 2px 5px #a3b1c6, -2px -2px 5px #ffffff;
+}
+
+.command-input-container button:active {
+  box-shadow: inset 5px 5px 10px #a3b1c6, inset -5px -5px 10px #ffffff;
+}
+
 .commands {
   width: 100%;
   max-width: 1200px;

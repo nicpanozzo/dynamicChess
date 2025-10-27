@@ -52,6 +52,9 @@ export class ChessboardComponent implements OnDestroy {
 
   @HostListener('document:keydown', ['$event'])
   handleKeyboardEvent(event: KeyboardEvent) {
+    if (event.target instanceof HTMLInputElement) {
+      return;
+    }
     if (event.key === '5' && this.pressTimer) { // Cancel move with '5'
       this.isMoveCanceled = true;
       this.resetMoveState(); // Reset state immediately
@@ -88,6 +91,9 @@ export class ChessboardComponent implements OnDestroy {
 
   @HostListener('document:keyup', ['$event'])
   handleKeyupEvent(event: KeyboardEvent) {
+    if (event.target instanceof HTMLInputElement) {
+      return;
+    }
     if (this.pressTimer && this.numpadDirection) {
       const pressDuration = Date.now() - this.pressTimer;
 

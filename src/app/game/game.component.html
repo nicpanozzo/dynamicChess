@@ -33,6 +33,12 @@
     </app-move-queue>
   </div>
 
+  <div class="command-input-container">
+    <input type="text" placeholder="Enter command..." #commandInput (keyup.enter)="executeCommand(commandInput.value)"/>
+    <button (click)="executeCommand(commandInput.value)">Submit</button>
+  </div>
+  <div *ngIf="commandError" class="error-message">{{ commandError }}</div>
+
   <div class="commands" *ngIf="showCommands">
     <h3>Commands</h3>
     <ul>

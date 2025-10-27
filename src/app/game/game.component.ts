@@ -28,6 +28,7 @@ export class GameComponent implements OnInit, AfterViewInit, OnDestroy {
   customCooldowns: { [key: string]: number } | null = null;
   sharedCooldowns: boolean = false;
   moveQueue: Map<string, { endRow: number; endCol: number }[]> = new Map();
+  commandError: string | null = null;
 
   private initialBoard: string[][] | null = null;
   private initialPlayers: any[] | null = null;
@@ -97,7 +98,17 @@ export class GameComponent implements OnInit, AfterViewInit, OnDestroy {
 
     this.subscriptions.add(this.socketService.listen('moveError').subscribe((message: string) => {
       this.zone.run(() => {
-        alert(`Move Error: ${message}`);
+        console.log('Move Error received:', message);
+        this.commandError = message;
+        setTimeout(() => this.commandError = null, 3000);
+      });
+    }));
+
+    this.subscriptions.add(this.socketService.listen('commandError').subscribe((message: string) => {
+      this.zone.run(() => {
+        console.log('Command Error received:', message);
+        this.commandError = message;
+        setTimeout(() => this.commandError = null, 3000);
       });
     }));
 
@@ -161,6 +172,14 @@ export class GameComponent implements OnInit, AfterViewInit, OnDestroy {
       this.socketService.emit('cancelFromQueue', { ...event, roomCode: this.roomCode });
     }
   }
+
+  executeCommand(command: string) {
+    if (this.roomCode && command) {
+      this.socketService.emit('executeCommand', { roomCode: this.roomCode, command });
+    }
+  }
+
+
 
 
 

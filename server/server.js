@@ -67,8 +67,9 @@ function processMoveQueues() {
                         io.to(roomCode).emit('queueUpdated', room.moveQueue);
                     }
                 } else {
-                    // Invalid move in queue, discard
-                    io.to(roomCode).emit('queueUpdated', room.moveQueue);
+                    // Move is invalid, discard it and notify client
+                    io.to(roomCode).emit('commandError', `Discarded invalid move for ${pieceKey}.`);
+                    io.to(roomCode).emit('queueUpdated', room.moveQueue); // Update queue to reflect discarded move
                 }
             }
         }
@@ -465,6 +466,14 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('executeCommand', (data) => {
+        const { roomCode, command } = data;
+        const room = rooms[roomCode];
+        if (room && room.gameStarted && !room.winner) {
+            parseAndExecuteCommand(room, command, socket);
+        }
+    });
+
     socket.on('disconnect', () => {
         console.log('Client disconnected:', socket.id);
         for (const roomCode in rooms) {
@@ -516,3 +525,356 @@ app.get('*', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
+function parseAndExecuteCommand(room, command, socket) {
+
+    const [filterStr, actionStr] = command.split('->');
+
+    if (!filterStr || !actionStr) {
+
+        socket.emit('commandError', 'Invalid command format. Use filter->action.');
+
+        return;
+
+    }
+
+
+
+    const filter = filterStr.trim();
+
+    let action = actionStr.trim();
+
+    let appendToQueue = false;
+
+
+
+    if (action.startsWith('&')) {
+
+        appendToQueue = true;
+
+        action = action.substring(1).trim(); // Remove '&'
+
+    }
+
+
+
+    const targetCoords = parseSquare(action);
+
+    if (!targetCoords) {
+
+        socket.emit('commandError', 'Invalid target square.');
+
+        return;
+
+    }
+
+    const { endRow, endCol } = targetCoords;
+
+
+
+            const pieces = findPieces(room.board, filter, socket.id, room.players);
+
+
+
+            let commandExecuted = false;
+
+
+
+            let commandQueued = false;
+
+
+
+            let commandFailedDueToCooldown = false;
+
+
+
+            let commandFailedDueToInvalidMove = false; // New flag
+
+
+
+        
+
+
+
+            for (const piece of pieces) {
+
+
+
+                const { row: startRow, col: startCol } = piece;
+
+
+
+                const pieceKey = `${startRow}-${startCol}`;
+
+
+
+                const now = Date.now();
+
+
+
+                const cooldown = room.cooldowns[pieceKey];
+
+
+
+        
+
+
+
+                const isCoolingDown = cooldown && now < cooldown;
+
+
+
+        
+
+
+
+                // Check move validity only if not appending to queue
+
+
+
+                const moveIsValid = isValidMove(room.board, startRow, startCol, endRow, endCol);
+
+
+
+        
+
+
+
+                if (isCoolingDown) {
+
+
+
+                    if (appendToQueue) {
+
+
+
+                        // Add to queue even if invalid
+
+
+
+                        if (!room.moveQueue[pieceKey]) {
+
+
+
+                            room.moveQueue[pieceKey] = [];
+
+
+
+                        }
+
+
+
+                        room.moveQueue[pieceKey].push({ startRow, startCol, endRow, endCol });
+
+
+
+                        commandQueued = true;
+
+
+
+                    } else {
+
+
+
+                        commandFailedDueToCooldown = true;
+
+
+
+                    }
+
+
+
+                } else { // No cooldown, or cooldown expired
+
+
+
+                    if (moveIsValid) {
+
+
+
+                        // Execute move directly
+
+
+
+                        let pieceToMove = room.board[startRow][startCol];
+
+
+
+                        if (pieceToMove.toLowerCase() === 'p' && (endRow === 0 || endRow === 7)) {
+
+
+
+                            pieceToMove = (pieceToMove === 'P') ? 'Q' : 'q';
+
+
+
+                        }
+
+
+
+                        room.board[endRow][endCol] = pieceToMove;
+
+
+
+                        room.board[startRow][startCol] = '';
+
+
+
+        
+
+
+
+                        const newPieceKey = `${endRow}-${endCol}`;
+
+
+
+                        const cooldownDuration = room.customCooldowns[piece.piece.toLowerCase()] || pieceCooldowns[piece.piece.toLowerCase()];
+
+
+
+                        if (cooldownDuration > 0) {
+
+
+
+                            room.cooldowns[newPieceKey] = now + cooldownDuration;
+
+
+
+                            io.to(room.roomCode).emit('cooldownsUpdated', room.cooldowns);
+
+
+
+                        }
+
+
+
+        
+
+
+
+                        io.to(room.roomCode).emit('moveMade', { move: { startRow, startCol, endRow, endCol }, board: room.board });
+
+
+
+                        commandExecuted = true;
+
+
+
+                    } else {
+
+
+
+                        commandFailedDueToInvalidMove = true;
+
+
+
+                    }
+
+
+
+                }
+
+
+
+            }
+
+
+
+        
+
+
+
+            // Emit feedback after the loop
+
+
+
+            if (commandExecuted) {
+
+
+
+                socket.emit('commandSuccess', 'Command executed successfully.');
+
+
+
+            } else if (commandQueued) {
+
+
+
+                socket.emit('commandSuccess', 'Moves added to queue (some may be invalid).');
+
+
+
+                io.to(room.roomCode).emit('queueUpdated', room.moveQueue);
+
+
+
+            } else if (commandFailedDueToCooldown) {
+
+
+
+                socket.emit('commandError', 'Some pieces are on cooldown. Use & to append to queue.');
+
+
+
+            } else if (commandFailedDueToInvalidMove) {
+
+
+
+                socket.emit('commandError', 'No valid move found for the given command (some moves were invalid).');
+
+
+
+            } else {
+
+
+
+                socket.emit('commandError', 'No pieces found matching the filter or no valid moves.');
+
+
+
+            }
+
+}
+
+function parseSquare(square) {
+    if (square.length !== 2) return null;
+    const file = square[0].toLowerCase();
+    const rank = parseInt(square[1], 10);
+    if (file < 'a' || file > 'h' || rank < 1 || rank > 8) return null;
+
+    const endCol = file.charCodeAt(0) - 'a'.charCodeAt(0);
+    const endRow = 8 - rank;
+    return { endRow, endCol };
+}
+
+function findPieces(board, filter, playerId, players) {
+    const player = players.find(p => p.id === playerId);
+    if (!player) return [];
+
+    const pieces = [];
+    const isRankFilter = /^[1-8]$/.test(filter);
+    const rankToFilter = isRankFilter ? 8 - parseInt(filter, 10) : -1;
+
+    for (let i = 0; i < 8; i++) {
+        for (let j = 0; j < 8; j++) {
+            const piece = board[i][j];
+            if (!piece) continue;
+
+            const isWhitePiece = piece === piece.toUpperCase();
+            const isPlayerPiece = (player.color === 'white' && isWhitePiece) || (player.color === 'black' && !isWhitePiece);
+
+            if (isPlayerPiece) {
+                if (isRankFilter) {
+                    if (i === rankToFilter) {
+                        pieces.push({ row: i, col: j, piece });
+                    }
+                } else { // piece type filter
+                    if (piece.toLowerCase() === filter) {
+                        pieces.push({ row: i, col: j, piece });
+                    }
+                }
+            }
+        }
+    }
+    return pieces;
+}
