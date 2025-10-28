@@ -127,6 +127,9 @@ export class ChessboardComponent implements OnDestroy {
   }
 
   updateCooldowns() {
+    if (!this.board || this.board.length === 0) {
+      return;
+    }
     this.zone.runOutsideAngular(() => {
       this.cooldowns.forEach((cooldown, key) => {
         const remaining = cooldown - Date.now();

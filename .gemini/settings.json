@@ -3,8 +3,7 @@
     "chrome-devtools": {
       "command": "npx",
       "args": [
-        "chrome-devtools-mcp@latest",
-        "--headless=false"
+        "chrome-devtools-mcp@latest"
       ]
     }
   }

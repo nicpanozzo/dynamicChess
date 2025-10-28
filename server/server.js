@@ -65,13 +65,13 @@ function processMoveQueues() {
                         room.winner = winner;
                         room.gameStarted = false; // Stop game on win
 
-                        room.players.forEach(p => {
+                        for (const p of room.players) {
                             if (p.color === winner) {
                                 p.wins++;
                             } else if (p.color !== 'spectator') {
                                 p.losses++;
                             }
-                        });
+                        }
 
                         io.to(roomCode).emit('gameOver', { winner, board: room.board, players: room.players });
                     } else {
@@ -383,8 +383,6 @@ io.on('connection', (socket) => {
             room.winner = null; // Reset winner for the new game
             room.players.forEach(p => {
                 p.isReady = false; // Reset readiness
-                p.wins = 0;
-                p.losses = 0;
             });
             io.to(roomCode).emit('gameStarted', room);
             console.log(`Game started in room ${roomCode}`);
@@ -829,13 +827,13 @@ function parseAndExecuteCommand(room, command, socket) {
                             room.winner = winner;
                             room.gameStarted = false;
 
-                            room.players.forEach(p => {
+                            for (const p of room.players) {
                                 if (p.color === winner) {
                                     p.wins++;
                                 } else if (p.color !== 'spectator') {
                                     p.losses++;
                                 }
-                            });
+                            }
 
                             io.to(room.roomCode).emit('gameOver', { winner, board: room.board, players: room.players });
                             break; // Break inner loop
