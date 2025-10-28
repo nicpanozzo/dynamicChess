@@ -19,14 +19,20 @@
   </div>                                                                                                                             
                                                                                                                                      
   <div class="game-area">
-    <app-chessboard
-      #chessboard
-      [board]="board"
-      [playerColor]="playerColor"
-      [customCooldowns]="customCooldowns"
-      [sharedCooldowns]="sharedCooldowns"
-      (moveMade)="onMoveMade($event)">
-    </app-chessboard>
+    <div class="board-and-input">
+      <app-chessboard
+        #chessboard
+        [board]="board"
+        [playerColor]="playerColor"
+        [customCooldowns]="customCooldowns"
+        [sharedCooldowns]="sharedCooldowns"
+        (moveMade)="onMoveMade($event)">
+      </app-chessboard>
+      <div class="command-input-container">
+        <input type="text" placeholder="Enter command..." #commandInput (keyup.enter)="executeCommand(commandInput.value)"/>
+        <button (click)="executeCommand(commandInput.value)">Submit</button>
+      </div>
+    </div>
     <app-move-queue
       [moveQueue]="moveQueue"
       [board]="board"
@@ -35,11 +41,6 @@
       (moveCancelled)="onMoveCancelled($event)"
       (clearQueueForPiece)="onClearQueueForPiece($event)">
     </app-move-queue>
-  </div>
-
-  <div class="command-input-container">
-    <input type="text" placeholder="Enter command..." #commandInput (keyup.enter)="executeCommand(commandInput.value)"/>
-    <button (click)="executeCommand(commandInput.value)">Submit</button>
   </div>
   <div *ngIf="commandError" class="error-message">{{ commandError }}</div>
 

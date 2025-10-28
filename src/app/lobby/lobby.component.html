@@ -12,7 +12,7 @@
         {{ player.username }} <span *ngIf="lobby.roomOwnerId === player.id">👑</span> <span *ngIf="player.isReady">✅</span>
         <button *ngIf="isOwner() && myPlayerId !== player.id" (click)="setOwner(player.id)">♚</button>
       </div>
-      <button (click)="changeTeam('white')">Join White</button>
+      <button *ngIf="!isPlayerOnTeam('white')" (click)="changeTeam('white')">Join White</button>
     </div>
 
     <div class="team-column">
@@ -21,7 +21,7 @@
         {{ player.username }} <span *ngIf="lobby.roomOwnerId === player.id">👑</span> <span *ngIf="player.isReady">✅</span>
         <button *ngIf="isOwner() && myPlayerId !== player.id" (click)="setOwner(player.id)">♚</button>
       </div>
-      <button (click)="changeTeam('black')">Join Black</button>
+      <button *ngIf="!isPlayerOnTeam('black')" (click)="changeTeam('black')">Join Black</button>
     </div>
 
     <div class="team-column">
@@ -30,7 +30,7 @@
         {{ player.username }} <span *ngIf="lobby.roomOwnerId === player.id">👑</span>
         <button *ngIf="isOwner() && myPlayerId !== player.id" (click)="setOwner(player.id)">♚</button>
       </div>
-      <button (click)="changeTeam('spectator')">Spectate</button>
+      <button *ngIf="!isPlayerOnTeam('spectator')" (click)="changeTeam('spectator')">Spectate</button>
     </div>
   </div>
 

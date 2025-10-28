@@ -65,14 +65,17 @@
 
 .game-area {
   display: flex;
+  justify-content: space-between;
   gap: 20px;
 }
 
-.command-input-container {
+.board-and-input {
   display: flex;
-  margin-top: 20px;
-  width: 100%;
-  max-width: 600px;
+  flex-direction: column;
+}
+
+.command-input-container {
+  margin-top: 10px;
 }
 
 .command-input-container input {

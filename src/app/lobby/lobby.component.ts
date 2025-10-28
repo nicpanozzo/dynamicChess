@@ -125,6 +125,11 @@ export class LobbyComponent implements OnInit, OnDestroy {
     return myPlayer ? myPlayer.isReady : false;
   }
 
+  isPlayerOnTeam(teamColor: string): boolean {
+    const myPlayer = this.getMyPlayer();
+    return myPlayer && myPlayer.color === teamColor;
+  }
+
   canStartGame() {
     if (!this.lobby || !this.lobby.players) {
       return false;
