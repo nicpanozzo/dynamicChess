@@ -58,9 +58,8 @@ export class LobbyComponent implements OnInit, OnDestroy {
     this.subscriptions.add(
       this.socketService.listen('gameStarted').subscribe((gameState: any) => {
         this.zone.run(() => {
-          this.router.navigate(['/game'], { 
+          this.router.navigate(['/game', gameState.roomCode], { 
             queryParams: { 
-              room: gameState.roomCode, 
               color: this.getMyPlayer()?.color, 
               customCooldowns: JSON.stringify(gameState.customCooldowns),
               sharedCooldowns: gameState.sharedCooldowns
@@ -99,11 +98,17 @@ export class LobbyComponent implements OnInit, OnDestroy {
   }
 
   getMyPlayer() {
-    return this.lobby?.players.find((p: any) => p.id === this.myPlayerId);
+    if (!this.lobby || !this.lobby.players) {
+      return null;
+    }
+    return this.lobby.players.find((p: any) => p.id === this.myPlayerId);
   }
 
   getTeam(team: string) {
-    return this.lobby?.players.filter((p: any) => p.color === team);
+    if (!this.lobby || !this.lobby.players) {
+      return [];
+    }
+    return this.lobby.players.filter((p: any) => p.color === team);
   }
 
   isOwner() {
@@ -121,7 +126,9 @@ export class LobbyComponent implements OnInit, OnDestroy {
   }
 
   canStartGame() {
-    if (!this.lobby) return false;
+    if (!this.lobby || !this.lobby.players) {
+      return false;
+    }
     if (this.lobby.winner) return true; // Always allow starting a new match if there is a winner
     const whitePlayer = this.lobby.players.find((p: any) => p.color === 'white');
     const blackPlayer = this.lobby.players.find((p: any) => p.color === 'black');

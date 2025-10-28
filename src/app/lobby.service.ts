@@ -1,10 +1,11 @@
 import { Injectable } from '@angular/core';
+import { BehaviorSubject } from 'rxjs';
 
 @Injectable({
   providedIn: 'root'
 })
 export class LobbyService {
-  public lobbyState: any = null;
+  public lobbyState = new BehaviorSubject<any>(null);
 
   constructor() { }
 }

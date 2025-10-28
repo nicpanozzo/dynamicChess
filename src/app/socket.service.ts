@@ -40,4 +40,12 @@ export class SocketService {
   disconnect() {
     this.socket?.disconnect();
   }
+
+  getEvents(): Observable<{type: string, data: any}> {
+    return new Observable(observer => {
+      this.socket?.onAny((event, ...args) => {
+        observer.next({ type: event, data: args[0] });
+      });
+    });
+  }
 }

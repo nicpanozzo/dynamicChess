@@ -1,10 +1,12 @@
-import { Component, OnInit, OnDestroy, ViewChild, AfterViewInit, NgZone } from '@angular/core';
-import { Subscription } from 'rxjs';
-import { ActivatedRoute, Router } from '@angular/router';
+import { Component, OnInit, OnDestroy, ViewChild, AfterViewInit, NgZone, ElementRef, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ChessboardComponent } from '../chessboard/chessboard.component';
-import { MoveQueueComponent } from './move-queue/move-queue.component';
 import { SocketService } from '../socket.service';
+import { ActivatedRoute, Router } from '@angular/router';
+import { MoveQueueComponent } from './move-queue/move-queue.component';
+import { UserService } from '../user.service';
+import { LobbyService } from '../lobby.service';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-game',
@@ -13,152 +15,165 @@ import { SocketService } from '../socket.service';
   templateUrl: './game.component.html',
   styleUrls: ['./game.component.css']
 })
-export class GameComponent implements OnInit, AfterViewInit, OnDestroy {
-  public showCommands = false;
-
-  @ViewChild(ChessboardComponent) chessboard!: ChessboardComponent;
+export class GameComponent implements OnInit, OnDestroy, AfterViewInit {
+  @ViewChild('chessboard') chessboard!: ChessboardComponent;
+  @ViewChild('commandInput') commandInputField!: ElementRef;
 
   roomCode: string | null = null;
   playerColor: 'white' | 'black' | 'spectator' | null = null;
-  opponentUsername: string = 'Waiting for opponent...';
-  isGameOver: boolean = false;
+  board: string[][] = [];
+  moveQueue: Map<string, { endRow: number; endCol: number }[]> = new Map();
+  cooldowns: { [key: string]: number } = {};
+  customCooldowns: { [key: string]: number } = {};
+  sharedCooldowns: boolean = false;
   winner: 'white' | 'black' | null = null;
+  players: { id: string, username: string, color: 'white' | 'black' | 'spectator', wins: number, losses: number }[] = [];
+  commandError: string | null = null;
+  commandHistory: string[] = [];
+  historyIndex: number = -1;
+  opponentUsername: string = '';
   playerWins: number = 0;
   playerLosses: number = 0;
-  customCooldowns: { [key: string]: number } | null = null;
-  sharedCooldowns: boolean = false;
-  moveQueue: Map<string, { endRow: number; endCol: number }[]> = new Map();
-  commandError: string | null = null;
+  showCommands: boolean = false;
+  isGameOver: boolean = false;
 
-  private initialBoard: string[][] | null = null;
-  private initialPlayers: any[] | null = null;
-  private subscriptions = new Subscription();
+  private socketSubscription: Subscription | undefined;
+  private lobbySubscription: Subscription | undefined;
 
   constructor(
+    private socketService: SocketService,
     private route: ActivatedRoute,
     private router: Router,
-    private socketService: SocketService,
+    private userService: UserService,
+    private lobbyService: LobbyService,
     private zone: NgZone
-  ) {
-    const navigation = this.router.getCurrentNavigation();
-    if (navigation?.extras.state) {
-      this.initialBoard = navigation.extras.state['board'];
-      this.initialPlayers = navigation.extras.state['players'];
-    }
-  }
+  ) { }
 
-  ngOnInit() {
-    this.roomCode = this.route.snapshot.queryParams['room'];
-    this.playerColor = this.route.snapshot.queryParams['color'];
-    const customCooldownsParam = this.route.snapshot.queryParams['customCooldowns'];
-    if (customCooldownsParam) {
-      this.customCooldowns = JSON.parse(customCooldownsParam);
-    }
-    this.sharedCooldowns = this.route.snapshot.queryParams['sharedCooldowns'] === 'true';
-
-    if (this.initialPlayers) {
-        const opponent = this.initialPlayers.find(p => p.color !== this.playerColor);
-        if (opponent) {
-            this.opponentUsername = opponent.username;
-        }
-    }
-
-
-    this.subscriptions.add(this.socketService.listen('moveMade').subscribe((data: { move: any, board: string[][] }) => {
-      console.log('[DEBUG] moveMade event received by client.', data);
+  ngOnInit(): void {
+    this.socketSubscription = this.socketService.getEvents().subscribe(event => {
       this.zone.run(() => {
-        if (this.chessboard) {
-          this.chessboard.board = data.board;
-        }
-      });
-    }));
-
-    this.subscriptions.add(this.socketService.listen('playerDisconnected').subscribe((data: { username: string }) => {
-      this.zone.run(() => {
-        this.opponentUsername = `${data.username} disconnected.`;
-        // The server will send a 'gameOver' event to handle the game end state.
-      });
-    }));
-
-    this.subscriptions.add(this.socketService.listen('gameOver').subscribe((data: { winner: 'white' | 'black', board: string[][], players: any[] }) => {
-      this.zone.run(() => {
-        console.log('Game Over event received:', data);
-        this.isGameOver = true;
-        this.winner = data.winner;
-        if (this.chessboard) {
-          this.chessboard.board = data.board;
-        }
-        const myPlayer = data.players.find(p => p.color === this.playerColor);
-        if (myPlayer) {
-            this.playerWins = myPlayer.wins;
-            this.playerLosses = myPlayer.losses;
+        if (event.type === 'gameStarted') {
+          this.board = event.data.board;
+          this.playerColor = event.data.players.find((p: any) => p.id === this.socketService.id)?.color || 'spectator';
+          console.log('--- GAME COMPONENT: gameStarted, playerColor ---', this.playerColor);
+          this.players = event.data.players;
+          this.updatePlayerStats();
+          this.moveQueue = new Map(Object.entries(event.data.moveQueue || {}));
+          this.cooldowns = event.data.cooldowns;
+          this.winner = event.data.winner;
+          this.isGameOver = !!event.data.winner;
+          this.customCooldowns = event.data.customCooldowns;
+          this.sharedCooldowns = event.data.sharedCooldowns;
+        } else if (event.type === 'moveMade') {
+          this.board = event.data.board;
+          this.moveQueue = new Map(Object.entries(event.data.moveQueue || {}));
+        } else if (event.type === 'queueUpdated') {
+          this.moveQueue = new Map(Object.entries(event.data || {}));
+        } else if (event.type === 'cooldownsUpdated') {
+          this.cooldowns = event.data;
+        } else if (event.type === 'gameOver') {
+          this.winner = event.data.winner;
+          this.board = event.data.board;
+          this.players = event.data.players;
+          this.updatePlayerStats();
+          this.isGameOver = true;
+        } else if (event.type === 'gameUpdate') {
+          this.board = event.data.board;
+          this.moveQueue = new Map(Object.entries(event.data.moveQueue || {}));
+          this.cooldowns = event.data.cooldowns;
+          this.winner = event.data.winner;
+          this.players = event.data.players;
+          this.playerColor = event.data.players.find((p: any) => p.id === this.socketService.id)?.color || 'spectator';
+          console.log('--- GAME COMPONENT: gameUpdate, playerColor ---', this.playerColor);
+          this.customCooldowns = event.data.customCooldowns;
+          this.sharedCooldowns = event.data.sharedCooldowns;
+        } else if (event.type === 'commandError') {
+          this.commandError = event.data;
+          setTimeout(() => this.commandError = null, 3000);
         }
       });
-    }));
+    });
 
-    this.subscriptions.add(this.socketService.listen('moveError').subscribe((message: string) => {
-      this.zone.run(() => {
-        console.log('Move Error received:', message);
-        this.commandError = message;
-        setTimeout(() => this.commandError = null, 3000);
-      });
-    }));
-
-    this.subscriptions.add(this.socketService.listen('commandError').subscribe((message: string) => {
-      this.zone.run(() => {
-        console.log('Command Error received:', message);
-        this.commandError = message;
-        setTimeout(() => this.commandError = null, 3000);
-      });
-    }));
-
-    this.subscriptions.add(this.socketService.listen('queueUpdated').subscribe((queue: any) => {
-      this.zone.run(() => {
-        this.moveQueue = new Map(Object.entries(queue));
-      });
-    }));
-  }
-
-  ngOnDestroy() {
-    this.subscriptions.unsubscribe();
-  }
-
-  ngAfterViewInit() {
-    if (this.chessboard) {
-      if (this.initialBoard) {
-        this.chessboard.board = this.initialBoard;
+    this.route.paramMap.subscribe(params => {
+      this.roomCode = params.get('roomCode');
+      const username = this.userService.getUsername();
+      if (this.roomCode && username) {
+        this.socketService.emit('enterRoom', { roomCode: this.roomCode, username: username });
       }
-      this.chessboard.playerColor = this.playerColor;
-      this.chessboard.customCooldowns = this.customCooldowns;
-      this.chessboard.sharedCooldowns = this.sharedCooldowns;
+    });
 
-      this.chessboard.moveMade.subscribe(move => {
-        if (this.roomCode && !this.isGameOver) {
-          this.socketService.emit('makeMove', {
-            roomCode: this.roomCode,
-            playerColor: this.playerColor,
-            move: move
-          });
+    this.lobbySubscription = this.lobbyService.lobbyState.subscribe((lobbyState: any) => {
+      if (lobbyState) {
+        this.customCooldowns = lobbyState.customCooldowns;
+        this.sharedCooldowns = lobbyState.sharedCooldowns;
+        if (lobbyState.board) {
+          this.board = lobbyState.board;
+          this.playerColor = lobbyState.players.find((p: any) => p.id === this.socketService.id)?.color || 'spectator';
+          console.log('--- GAME COMPONENT: lobbyState, playerColor ---', this.playerColor);
+          this.players = lobbyState.players;
+          this.updatePlayerStats();
+          this.moveQueue = new Map(Object.entries(lobbyState.moveQueue || {}));
+          this.cooldowns = lobbyState.cooldowns;
+          this.winner = lobbyState.winner;
+          this.isGameOver = !!lobbyState.winner;
         }
-      });
+      }
+    });
+  }
+
+  ngAfterViewInit(): void {
+    // Focus the command input field after the view has initialized
+    if (this.commandInputField) {
+      this.commandInputField.nativeElement.focus();
     }
   }
 
+  ngOnDestroy(): void {
+    this.socketSubscription?.unsubscribe();
+    this.lobbySubscription?.unsubscribe();
+  }
 
-
-  resign() {
-    if (confirm('Are you sure you want to resign?')) {
-      this.socketService.emit('resign', { roomCode: this.roomCode, playerColor: this.playerColor });
+  executeCommand(command: string) {
+    if (this.roomCode && command) {
+      this.socketService.emit('executeCommand', { roomCode: this.roomCode, command });
+      this.commandHistory.unshift(command); // Add to the beginning of the history
+      this.historyIndex = -1; // Reset history index
+      this.commandInputField.nativeElement.value = ''; // Clear input after command
     }
   }
 
-  backToLobby() {
-    this.router.navigate(['/lobby', this.roomCode]);
+  onMoveMade(move: { startRow: number, startCol: number, endRow: number, endCol: number }) {
+    if (this.roomCode) {
+      this.socketService.emit('makeMove', { roomCode: this.roomCode, move, playerColor: this.playerColor });
+    }
   }
 
-  leaveGameAndDisconnect() {
-    this.socketService.disconnect();
-    this.router.navigate(['/']);
+  @HostListener('keydown.arrowup', ['$event'])
+  onArrowUp(event: any) {
+    const keyboardEvent = event as KeyboardEvent;
+    if (this.commandInputField && this.commandInputField.nativeElement === document.activeElement) {
+      keyboardEvent.preventDefault(); // Prevent cursor from moving in the input
+      if (this.commandHistory.length > 0) {
+        this.historyIndex = Math.min(this.commandHistory.length - 1, this.historyIndex + 1);
+        this.commandInputField.nativeElement.value = this.commandHistory[this.historyIndex];
+      }
+    }
+  }
+
+  @HostListener('keydown.arrowdown', ['$event'])
+  onArrowDown(event: any) {
+    const keyboardEvent = event as KeyboardEvent;
+    if (this.commandInputField && this.commandInputField.nativeElement === document.activeElement) {
+      keyboardEvent.preventDefault(); // Prevent cursor from moving in the input
+      if (this.commandHistory.length > 0) {
+        this.historyIndex = Math.max(-1, this.historyIndex - 1);
+        if (this.historyIndex === -1) {
+          this.commandInputField.nativeElement.value = '';
+        } else {
+          this.commandInputField.nativeElement.value = this.commandHistory[this.historyIndex];
+        }
+      }
+    }
   }
 
   onMoveReordered(event: { pieceKey: string, previousIndex: number, currentIndex: number }) {
@@ -173,14 +188,35 @@ export class GameComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  executeCommand(command: string) {
-    if (this.roomCode && command) {
-      this.socketService.emit('executeCommand', { roomCode: this.roomCode, command });
+  onClearQueueForPiece(pieceKey: string) {
+    if (this.roomCode) {
+      this.socketService.emit('cancelFromQueue', { roomCode: this.roomCode, pieceKey, moveIndex: -1 });
     }
   }
 
+  updatePlayerStats() {
+    const username = this.userService.getUsername();
+    const player = this.players.find(p => p.username === username);
+    if (player) {
+      this.playerWins = player.wins;
+      this.playerLosses = player.losses;
+    }
+  }
 
+  leaveRoom(): void {
+    if (this.roomCode) {
+      this.socketService.emit('leaveRoom', { roomCode: this.roomCode });
+      this.router.navigate(['/home']);
+    }
+  }
 
+  resign(): void {
+    if (this.roomCode) {
+      this.socketService.emit('resign', { roomCode: this.roomCode });
+    }
+  }
 
-
+  backToLobby(): void {
+    this.router.navigate(['/lobby', this.roomCode]);
+  }
 }

@@ -8,7 +8,7 @@ import { LobbyComponent } from './lobby/lobby.component';
 const routes: Routes = [
   { path: '', component: HomeComponent },
   { path: 'lobby/:roomCode', component: LobbyComponent },
-  { path: 'game', component: GameComponent },
+  { path: 'game/:roomCode', component: GameComponent },
   { path: 'rules', component: RulesComponent }
 ];
 

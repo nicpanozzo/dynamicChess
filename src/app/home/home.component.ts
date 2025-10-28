@@ -41,7 +41,7 @@ export class HomeComponent implements OnInit, OnDestroy {
     this.subscriptions.add(
       this.socketService.listen('lobbyState').subscribe((data: any) => {
         if (data && data.roomCode) {
-          this.lobbyService.lobbyState = data;
+          this.lobbyService.lobbyState.next(data);
           this.zone.run(() => {
             this.router.navigate(['/lobby', data.roomCode]);
           });

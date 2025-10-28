@@ -28,7 +28,7 @@ export class ChessboardComponent implements OnDestroy {
     }
   }
 
-  board: string[][] = [];
+  @Input() board: string[][] = [];
   selectedPieces: { row: number, col: number, piece: string }[] = [];
   turn: 'white' | 'black' = 'white';
   numpadDirection: number | null = null;
@@ -39,6 +39,8 @@ export class ChessboardComponent implements OnDestroy {
   isLandingMoveLegal: boolean = false; // New property
   isMoveCanceled: boolean = false; // New property
   cooldowns = new Map<string, number>();
+  cooldownDisplay = new Map<string, { timeLeft: number, opacity: number }>();
+  private animationFrameId: number | undefined;
   currentPieceIndex = 0;
 
   pieceCooldowns: { [key: string]: number } = {
@@ -110,18 +112,44 @@ export class ChessboardComponent implements OnDestroy {
   }
 
   constructor(private socketService: SocketService, private zone: NgZone) {
-    this.initializeBoard();
-
     this.socketService.listen('cooldownsUpdated').subscribe((cooldowns: any) => {
       this.cooldowns = new Map(Object.entries(cooldowns));
+      if (!this.animationFrameId) {
+        this.updateCooldowns();
+      }
     });
-
-    setInterval(() => {
-      this.zone.run(() => {});
-    }, 100);
   }
 
   ngOnDestroy() {
+    if (this.animationFrameId) {
+      cancelAnimationFrame(this.animationFrameId);
+    }
+  }
+
+  updateCooldowns() {
+    this.zone.runOutsideAngular(() => {
+      this.cooldowns.forEach((cooldown, key) => {
+        const remaining = cooldown - Date.now();
+        if (remaining > 0) {
+          const [row, col] = key.split('-').map(Number);
+          const piece = this.board[row][col];
+          if (piece) {
+            const totalCooldown = this.pieceCooldowns[piece.toLowerCase() as keyof typeof this.pieceCooldowns];
+            const opacity = remaining / totalCooldown;
+            const timeLeft = Math.ceil(remaining / 1000);
+            this.cooldownDisplay.set(key, { timeLeft, opacity });
+          }
+        } else {
+          this.cooldownDisplay.delete(key);
+        }
+      });
+
+      this.zone.run(() => {
+        // This will trigger change detection
+      });
+
+      this.animationFrameId = requestAnimationFrame(() => this.updateCooldowns());
+    });
   }
 
   initializeBoard() {
@@ -452,27 +480,13 @@ export class ChessboardComponent implements OnDestroy {
   }
 
   getCooldownTimeLeft(row: number, col: number): number {
-    const cooldown = this.cooldowns.get(`${row}-${col}`);
-    if (cooldown) {
-      const remaining = cooldown - Date.now();
-      return Math.ceil(remaining / 1000); // Return seconds, rounded up
-    }
-    return 0;
+    const display = this.cooldownDisplay.get(`${row}-${col}`);
+    return display ? display.timeLeft : 0;
   }
 
   getCooldownOpacity(row: number, col: number): number {
-    const cooldown = this.cooldowns.get(`${row}-${col}`);
-    if (cooldown) {
-      const remaining = cooldown - Date.now();
-      if (remaining > 0) {
-        const piece = this.board[row][col];
-        if (piece) {
-          const totalCooldown = this.pieceCooldowns[piece.toLowerCase() as keyof typeof this.pieceCooldowns];
-          return (remaining / totalCooldown);
-        }
-      }
-    }
-    return 0;
+    const display = this.cooldownDisplay.get(`${row}-${col}`);
+    return display ? display.opacity : 0;
   }
 
   isSelected(row: number, col: number): boolean {
@@ -499,12 +513,12 @@ export class ChessboardComponent implements OnDestroy {
       case 'b': return '♝';
       case 'q': return '♛';
       case 'k': return '♚';
-      case 'P': return '♟';
-      case 'R': return '♜';
-      case 'N': return '♞';
-      case 'B': return '♝';
-      case 'Q': return '♛';
-      case 'K': return '♚';
+      case 'P': return '♙';
+      case 'R': return '♖';
+      case 'N': return '♘';
+      case 'B': return '♗';
+      case 'Q': return '♕';
+      case 'K': return '♔';
       default: return '';
     }
   }
@@ -531,8 +545,4 @@ export class ChessboardComponent implements OnDestroy {
     this.selectedPieces = [];
     setTimeout(() => this.reachedCell = null, 1000);
   }
-
-
-
-
 }
