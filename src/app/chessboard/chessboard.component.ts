@@ -36,8 +36,10 @@ export class ChessboardComponent implements OnDestroy {
   pressPercentage = 0;
   reachedCell: { row: number, col: number } | null = null;
   landingCell: { row: number, col: number } | null = null;
-  isLandingMoveLegal: boolean = false; // New property
-  isMoveCanceled: boolean = false; // New property
+  landingCells: Map<string, { row: number, col: number }> = new Map();
+  isLandingMoveLegal: boolean = false;
+  isLandingMoveLegalMap: Map<string, boolean> = new Map();
+  isMoveCanceled: boolean = false;
   cooldowns = new Map<string, number>();
   cooldownDisplay = new Map<string, { timeLeft: number, opacity: number }>();
   private animationFrameId: number | undefined;
@@ -60,7 +62,7 @@ export class ChessboardComponent implements OnDestroy {
     if (event.key === '5' && this.pressTimer) { // Cancel move with '5'
       this.isMoveCanceled = true;
       this.resetMoveState(); // Reset state immediately
-      this.applyCooldown(false); // Apply half cooldown
+      this.applyCooldown(false, this.selectedPieces); // Apply half cooldown
       event.preventDefault(); // Prevent default '5' behavior
       return;
     }
@@ -100,12 +102,26 @@ export class ChessboardComponent implements OnDestroy {
       const pressDuration = Date.now() - this.pressTimer;
 
       if (this.isMoveCanceled) {
-        this.applyCooldown(false); // Half cooldown for canceled move
-      } else if (this.isLandingMoveLegal) {
-        this.movePiece(this.numpadDirection, pressDuration);
+        this.applyCooldown(false, this.selectedPieces);
       } else {
-        // Move was illegal, apply full cooldown without moving piece
-        this.applyCooldown(true);
+        const piecesToMove: { row: number, col: number, piece: string }[] = [];
+        const piecesToCooldown: { row: number, col: number, piece: string }[] = [];
+
+        this.selectedPieces.forEach(piece => {
+          const pieceKey = `${piece.row}-${piece.col}`;
+          if (this.isLandingMoveLegalMap.get(pieceKey)) {
+            piecesToMove.push(piece);
+          } else {
+            piecesToCooldown.push(piece);
+          }
+        });
+
+        if (piecesToMove.length > 0) {
+          this.movePiece(this.numpadDirection, pressDuration, piecesToMove);
+        }
+        if (piecesToCooldown.length > 0) {
+          this.applyCooldown(true, piecesToCooldown);
+        }
       }
       this.resetMoveState();
     }
@@ -307,85 +323,22 @@ export class ChessboardComponent implements OnDestroy {
     return pieces;
   }
 
-  movePiece(direction: number, pressDuration: number) {
-    if (this.selectedPieces.length === 0) {
+  movePiece(direction: number, pressDuration: number, piecesToMove: { row: number, col: number, piece: string }[]) {
+    if (piecesToMove.length === 0) {
       return;
     }
 
-    this.selectedPieces.forEach(selectedPiece => {
+    piecesToMove.forEach(selectedPiece => {
       const { row, col, piece } = selectedPiece;
-      const pieceType = piece.toLowerCase() as keyof typeof this.pieceCooldowns;
+      const pieceKey = `${row}-${col}`;
+      const landing = this.landingCells.get(pieceKey);
 
-      let rowStep = 0;
-      let colStep = 0;
-
-      if (pieceType === 'n') {
-        const longPress = pressDuration > 1000;
-        let newRow1: number, newCol1: number, newRow2: number, newCol2: number;
-
-        switch (direction) {
-          case 1: newRow1 = row + 1; newCol1 = col - 2; newRow2 = row + 2; newCol2 = col - 1; break;
-          case 2: newRow1 = row + 2; newCol1 = col - 1; newRow2 = row + 2; newCol2 = col + 1; break;
-          case 3: newRow1 = row + 1; newCol1 = col + 2; newRow2 = row + 2; newCol2 = col + 1; break;
-          case 4: newRow1 = row - 1; newCol1 = col - 2; newRow2 = row + 1; newCol2 = col - 2; break;
-          case 6: newRow1 = row - 1; newCol1 = col + 2; newRow2 = row + 1; newCol2 = col + 2; break;
-          case 7: newRow1 = row - 1; newCol1 = col - 2; newRow2 = row - 2; newCol2 = col - 1; break;
-          case 8: newRow1 = row - 2; newCol1 = col - 1; newRow2 = row - 2; newCol2 = col + 1; break;
-          case 9: newRow1 = row - 1; newCol1 = col + 2; newRow2 = row - 2; newCol2 = col + 1; break;
-          default: return;
-        }
-
-        const targetRow = longPress ? newRow2 : newRow1;
-        const targetCol = longPress ? newCol2 : newCol1;
-
-        if (this.isValidMove(row, col, targetRow, targetCol)) {
-          this.move(row, col, targetRow, targetCol);
-        }
+      if (!landing) {
+        console.warn(`No landing cell found for piece at ${pieceKey}`);
         return;
       }
 
-      switch (direction) {
-        case 1: rowStep = 1; colStep = -1; break;
-        case 2: rowStep = 1; break;
-        case 3: rowStep = 1; colStep = 1; break;
-        case 4: colStep = -1; break;
-        case 6: colStep = 1; break;
-        case 7: rowStep = -1; colStep = -1; break;
-        case 8: rowStep = -1; break;
-        case 9: rowStep = -1; colStep = 1; break;
-      }
-
-      if (pieceType === 'p') {
-        if (this.landingCell && this.isLandingMoveLegal) {
-          this.move(row, col, this.landingCell.row, this.landingCell.col);
-        } else {
-          // Fallback to original logic if landingCell is not valid or move is illegal
-          const maxDistance = (row === 1 && piece === 'p') || (row === 6 && piece === 'P') ? 2 : 1;
-          const distance = pressDuration > 2000 ? maxDistance : 1;
-          const newRow = row + rowStep * distance;
-          const newCol = col + colStep * distance;
-          if (this.isValidMove(row, col, newRow, newCol)) {
-            this.move(row, col, newRow, newCol);
-          }
-        }
-      } else if (pieceType === 'r' || pieceType === 'b' || pieceType === 'q') {
-        const distance = Math.floor(pressDuration / 500) + 1;
-        let newRow = row;
-        let newCol = col;
-        for (let i = 0; i < distance; i++) {
-          const tempRow = newRow + rowStep;
-          const tempCol = newCol + colStep;
-          if (this.isValidMove(row, col, tempRow, tempCol)) {
-            newRow = tempRow;
-            newCol = tempCol;
-          } else {
-            break;
-          }
-        }
-        if (newRow !== row || newCol !== col) {
-          this.move(row, col, newRow, newCol);
-        }
-      }
+      this.move(row, col, landing.row, landing.col);
     });
     this.selectedPieces = [];
   }
@@ -400,11 +353,18 @@ export class ChessboardComponent implements OnDestroy {
         const pressDuration = Date.now() - this.pressTimer;
         this.pressPercentage = Math.min(100, (pressDuration / 2000) * 100);
 
-        if (this.selectedPieces.length === 1) {
-          const { row, col, piece } = this.selectedPieces[0];
-          const pieceType = piece.toLowerCase();
+        this.landingCells.clear();
+        this.isLandingMoveLegalMap.clear();
+
+        this.selectedPieces.forEach(piece => {
+          const { row, col, piece: pieceName } = piece;
+          const pieceKey = `${row}-${col}`;
+          const pieceType = pieceName.toLowerCase();
           let rowStep = 0;
           let colStep = 0;
+
+          let targetRow: number | undefined;
+          let targetCol: number | undefined;
 
           if (pieceType === 'n') {
             const longPress = pressDuration > 1000;
@@ -425,7 +385,8 @@ export class ChessboardComponent implements OnDestroy {
             }
 
             if (newRow1 !== undefined && newCol1 !== undefined && newRow2 !== undefined && newCol2 !== undefined) {
-              this.landingCell = longPress ? { row: newRow2, col: newCol2 } : { row: newRow1, col: newCol1 };
+              targetRow = longPress ? newRow2 : newRow1;
+              targetCol = longPress ? newCol2 : newCol1;
             }
 
           } else {
@@ -446,22 +407,46 @@ export class ChessboardComponent implements OnDestroy {
             for (let i = 0; i < distance; i++) {
               const tempRow = newRow + rowStep;
               const tempCol = newCol + colStep;
+              // We need to check isValidMove from the original position
               if (this.isValidMove(row, col, tempRow, tempCol)) {
                 newRow = tempRow;
                 newCol = tempCol;
               } else {
+                // If the next step is invalid, stop.
                 break;
               }
             }
-            this.landingCell = { row: newRow, col: newCol };
+            targetRow = newRow;
+            targetCol = newCol;
           }
 
-          // Check legality of the landing cell
-          if (this.selectedPieces.length > 0 && this.landingCell) {
-            const { row: startR, col: startC } = this.selectedPieces[0];
-            this.isLandingMoveLegal = this.isValidMove(startR, startC, this.landingCell.row, this.landingCell.col);
+          if (targetRow !== undefined && targetCol !== undefined) {
+            // Boundary check before storing
+            if (targetRow >= 0 && targetRow <= 7 && targetCol >= 0 && targetCol <= 7) {
+              this.landingCells.set(pieceKey, { row: targetRow, col: targetCol });
+              const isLegal = this.isValidMove(row, col, targetRow, targetCol);
+              this.isLandingMoveLegalMap.set(pieceKey, isLegal);
+
+              // For single piece selection, keep the old properties for UI feedback
+              if (this.selectedPieces.length === 1) {
+                this.landingCell = { row: targetRow, col: targetCol };
+                this.isLandingMoveLegal = isLegal;
+              }
+            } else {
+              // Mark as illegal if out of bounds
+              this.isLandingMoveLegalMap.set(pieceKey, false);
+              if (this.selectedPieces.length === 1) {
+                this.isLandingMoveLegal = false;
+              }
+            }
+          } else {
+            // If targetRow or targetCol are undefined, it's an invalid move
+            this.isLandingMoveLegalMap.set(pieceKey, false);
+            if (this.selectedPieces.length === 1) {
+              this.isLandingMoveLegal = false;
+            }
           }
-        }
+        });
       });
 
       requestAnimationFrame(() => this.updatePressPercentage());
@@ -501,11 +486,23 @@ export class ChessboardComponent implements OnDestroy {
   }
 
   isLanding(row: number, col: number): boolean {
-    return this.landingCell?.row === row && this.landingCell?.col === col;
+    // Check if any of the selected pieces have this cell as a landing cell
+    for (const [key, landing] of this.landingCells.entries()) {
+      if (landing.row === row && landing.col === col) {
+        return true;
+      }
+    }
+    return false;
   }
 
   isIllegalLanding(row: number, col: number): boolean {
-    return this.isLanding(row, col) && !this.isLandingMoveLegal;
+    // Check if this cell is a landing cell for any piece and if that move is illegal
+    for (const [key, landing] of this.landingCells.entries()) {
+      if (landing.row === row && landing.col === col) {
+        return !this.isLandingMoveLegalMap.get(key);
+      }
+    }
+    return false;
   }
 
   getPieceSymbol(piece: string): string {
@@ -526,8 +523,8 @@ export class ChessboardComponent implements OnDestroy {
     }
   }
 
-  private applyCooldown(full: boolean) {
-    this.selectedPieces.forEach(selectedPiece => {
+  private applyCooldown(full: boolean, pieces: { row: number, col: number, piece: string }[]) {
+    pieces.forEach(selectedPiece => {
       const { row, col, piece } = selectedPiece;
       const pieceType = piece.toLowerCase() as keyof typeof this.pieceCooldowns;
       const cooldownDuration = this.pieceCooldowns[pieceType];
@@ -546,6 +543,8 @@ export class ChessboardComponent implements OnDestroy {
     this.isLandingMoveLegal = false;
     this.isMoveCanceled = false;
     this.selectedPieces = [];
+    this.landingCells.clear();
+    this.isLandingMoveLegalMap.clear();
     setTimeout(() => this.reachedCell = null, 1000);
   }
 }

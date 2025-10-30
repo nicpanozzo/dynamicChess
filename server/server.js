@@ -31,58 +31,127 @@ function processMoveQueues() {
         const room = rooms[roomCode];
         if (!room.gameStarted || room.winner) continue;
 
-        for (const pieceKey in room.moveQueue) {
-            let queue = room.moveQueue[pieceKey];
-            if (queue.length === 0) continue;
+        // Iterate through the board to find pieces that might have queued moves
+        for (let r = 0; r < 8; r++) {
+            for (let c = 0; c < 8; c++) {
+                const piece = room.board[r][c];
+                if (!piece) continue;
 
-            const cooldown = room.cooldowns[pieceKey];
-            if (!cooldown || now >= cooldown) {
-                const move = queue.shift();
-                const { startRow, startCol } = getCoordsFromKey(pieceKey);
-                const piece = room.board[startRow][startCol];
+                const pieceKey = `${r}-${c}`;
+                let queue = room.moveQueue[pieceKey];
 
-                if (piece && isValidMove(room.board, startRow, startCol, move.endRow, move.endCol)) {
-                    let pieceToMove = room.board[startRow][startCol];
-                    if (pieceToMove.toLowerCase() === 'p' && (move.endRow === 0 || move.endRow === 7)) {
+                if (!queue || queue.length === 0) continue;
+
+                const cooldown = room.cooldowns[pieceKey];
+                if (!cooldown || now >= cooldown) {
+                                    const actionObj = queue[0]; // Peek at the first action, don't shift yet
+                                    const { actionType, appendToQueue: actionAppendToQueue } = actionObj;
+                                    let endRow, endCol;
+                    
+                                    if (actionType === 'move') {
+                                        endRow = actionObj.endRow;
+                                        endCol = actionObj.endCol;
+                                    } else if (actionType === 'directionalMove') {
+                                                            let { rowStep, colStep } = actionObj.direction;
+                                                            const { quantity, directionStr } = actionObj;                    
+                    if (piece.toLowerCase() === 'n' && directionStr && directionStr.length === 2) {
+                        const dir1 = directionStr[0];
+                        const dir2 = directionStr[1];
+
+                        let rStep = 0;
+                        let cStep = 0;
+                        let isKnightMove = false;
+
+                        if (['u', 'd'].includes(dir1) && ['l', 'r'].includes(dir2)) {
+                            isKnightMove = true;
+                            if (dir1 === 'u') rStep = -2;
+                            if (dir1 === 'd') rStep = 2;
+                            if (dir2 === 'l') cStep = -1;
+                            if (dir2 === 'r') cStep = 1;
+                        } else if (['l', 'r'].includes(dir1) && ['u', 'd'].includes(dir2)) {
+                            isKnightMove = true;
+                            if (dir1 === 'l') cStep = -2;
+                            if (dir1 === 'r') cStep = 2;
+                            if (dir2 === 'u') rStep = -1;
+                            if (dir2 === 'd') rStep = 1;
+                        }
+
+                        if (isKnightMove) {
+                            const isWhitePiece = piece === piece.toUpperCase();
+                            if (!isWhitePiece) { // If black piece
+                                rStep *= -1;
+                                cStep *= -1;
+                            }
+                            endRow = r + rStep;
+                            endCol = c + cStep;
+                        } else {
+                            const isWhitePiece = piece === piece.toUpperCase();
+                            if (!isWhitePiece) { // If black piece
+                                rowStep *= -1;
+                                colStep *= -1;
+                            }
+                            endRow = r + rowStep * quantity;
+                            endCol = c + colStep * quantity;
+                        }
+                    } else {
+                        const isWhitePiece = piece === piece.toUpperCase();
+                        if (!isWhitePiece) { // If black piece
+                            rowStep *= -1;
+                            colStep *= -1;
+                        }
+                        endRow = r + rowStep * quantity;
+                        endCol = c + colStep * quantity;
+                    }
+                }
+                if (isValidMove(room.board, r, c, endRow, endCol)) {
+                    queue.shift(); // Now shift the move as it's valid
+
+                    let pieceToMove = room.board[r][c];
+                    if (pieceToMove.toLowerCase() === 'p' && (endRow === 0 || endRow === 7)) {
                         pieceToMove = (pieceToMove === 'P') ? 'Q' : 'q';
                     }
-                    room.board[move.endRow][move.endCol] = pieceToMove;
-                    room.board[startRow][startCol] = '';
+                    room.board[endRow][endCol] = pieceToMove;
+                    room.board[r][c] = '';
 
-                    const newPieceKey = `${move.endRow}-${move.endCol}`;
+                    const newPieceKey = `${endRow}-${endCol}`;
                     room.cooldowns[newPieceKey] = now + (room.customCooldowns[piece.toLowerCase()] || pieceCooldowns[piece.toLowerCase()]);
+                                        
+                                        // Transfer remaining moves to new pieceKey if it's the same piece
+                                        if (queue.length > 0) {
+                                            room.moveQueue[newPieceKey] = queue; 
+                                        }
+                                        delete room.moveQueue[pieceKey];
                     
-                    // Transfer remaining moves to new pieceKey if it's the same piece
-                    if (queue.length > 0) {
-                        room.moveQueue[newPieceKey] = queue; 
-                    }
-                    delete room.moveQueue[pieceKey];
-
-                    io.to(roomCode).emit('cooldownsUpdated', room.cooldowns);
-
-                    const winner = checkWinCondition(room.board);
-                    if (winner) {
-                        room.winner = winner;
-                        room.gameStarted = false; // Stop game on win
-
-                        room.players.forEach(p => {
-                            if (p.color === winner) {
-                                p.wins++;
-                            } else if (p.color !== 'spectator') {
-                                p.losses++;
-                            }
-                        });
-
-                        io.to(roomCode).emit('gameOver', { winner, board: room.board, players: room.players });
-                    } else {
-                        io.to(roomCode).emit('moveMade', { move, board: room.board, moveQueue: room.moveQueue });
-                        io.to(roomCode).emit('queueUpdated', room.moveQueue);
-                    }
-                } else {
-                    // Move is invalid, discard it and notify client
-                    io.to(roomCode).emit('commandError', `Discarded invalid move for ${pieceKey}.`);
-                    io.to(roomCode).emit('queueUpdated', room.moveQueue); // Update queue to reflect discarded move
-                }
+                                        io.to(roomCode).emit('cooldownsUpdated', room.cooldowns);
+                    
+                                        const winner = checkWinCondition(room.board);
+                                        if (winner) {
+                                            room.winner = winner;
+                                            room.gameStarted = false; // Stop game on win
+                    
+                                            room.players.forEach(p => {
+                                                if (p.color === winner) {
+                                                    p.wins++;
+                                                } else if (p.color !== 'spectator') {
+                                                    p.losses++;
+                                                }
+                                            });
+                    
+                                            io.to(roomCode).emit('gameOver', { winner, board: room.board, players: room.players });
+                                            return; // Exit function for this room after game over
+                                        } else {
+                                            io.to(roomCode).emit('moveMade', { move: { startRow: r, startCol: c, endRow, endCol }, board: room.board });
+                                            io.to(roomCode).emit('queueUpdated', room.moveQueue);
+                                        }
+                                    } else {
+                                        // Move is invalid, discard it and log
+                                        console.log(`Discarded invalid move for ${pieceKey}: ${JSON.stringify(actionObj)}`);
+                                        queue.shift(); // Discard the invalid move
+                                        if (queue.length === 0) {
+                                            delete room.moveQueue[pieceKey];
+                                        }
+                                        io.to(roomCode).emit('queueUpdated', room.moveQueue); // Update queue to reflect discarded move
+                                    }                }
             }
         }
     }
@@ -123,21 +192,29 @@ function isValidMove(board, startRow, startCol, endRow, endCol) {
 
     switch (piece.toLowerCase()) {
         case 'p': // Pawn
+            console.log(`Pawn move check: ${startRow},${startCol} to ${endRow},${endCol}`);
+            console.log(`Piece: ${piece}, Target Piece: ${targetPiece}`);
+            console.log(`Moving Piece is White: ${movingPieceIsWhite}`);
             const direction = movingPieceIsWhite ? -1 : 1; // White pawns move up (-1 row), Black pawns move down (+1 row)
             const initialRow = movingPieceIsWhite ? 6 : 1; 
+            console.log(`Direction: ${direction}, Initial Row: ${initialRow}`);
 
             // Normal one-step move
             if (startCol === endCol && endRow === startRow + direction && !board[endRow][endCol]) {
+                console.log('Pawn: Valid one-step move');
                 return true;
             }
             // Two-step initial move
             if (startCol === endCol && startRow === initialRow && endRow === startRow + 2 * direction && !board[startRow + direction][endCol] && !board[endRow][endCol]) {
+                console.log('Pawn: Valid two-step initial move');
                 return true;
             }
             // Capture (diagonal move)
             if (Math.abs(startCol - endCol) === 1 && endRow === startRow + direction && targetPiece) {
+                console.log('Pawn: Valid capture move');
                 return true;
             }
+            console.log('Pawn: No valid pawn move condition met');
             break;
         case 'r': // Rook
             if (startRow === endRow) {
@@ -708,16 +785,15 @@ function parseAndExecuteCommand(room, command, socket) {
         let commandFailedDueToInvalidMove = false; // New flag
 
         for (const piece of pieces) {
-            const { row: startRow, col: startCol } = piece;
-            const pieceKey = `${startRow}-${startCol}`;
+            let { row: startRow, col: startCol } = piece;
+            let pieceKey = `${startRow}-${startCol}`;
             const now = Date.now();
             const cooldown = room.cooldowns[pieceKey];
 
             const isCoolingDown = cooldown && now < cooldown;
 
-            let pieceHandledThisTurn = false; // Flag to track if this piece has been handled (moved or queued)
-
             for (const actionObj of actionList) {
+
                 const { actionType, appendToQueue: actionAppendToQueue } = actionObj;
                 let endRow, endCol;
 
@@ -728,7 +804,7 @@ function parseAndExecuteCommand(room, command, socket) {
                 if (actionType === 'clearQueue') {
                     delete room.moveQueue[pieceKey];
                     commandExecuted = true;
-                    pieceHandledThisTurn = true;
+                    pieceActionHandled = true; // Mark as handled
                     io.to(room.roomCode).emit('queueUpdated', room.moveQueue);
                     continue; // Skip the rest of the loop for clearQueue action
                 } else if (actionType === 'move') {
@@ -779,7 +855,7 @@ function parseAndExecuteCommand(room, command, socket) {
                                 colStep *= -1;
                             }
                             endRow = startRow + rowStep * quantity;
-                            endCol = startCol + colStep * quantity;
+                            endCol = startCol + colColStep * quantity;
                         }
                     } else {
                         if (player && player.color === 'black') {
@@ -802,9 +878,8 @@ function parseAndExecuteCommand(room, command, socket) {
                         if (!room.moveQueue[pieceKey]) {
                             room.moveQueue[pieceKey] = [];
                         }
-                        room.moveQueue[pieceKey].push({ startRow, startCol, endRow, endCol });
+                        room.moveQueue[pieceKey].push(actionObj);
                         commandQueued = true;
-                        pieceHandledThisTurn = true;
                     } else {
                         commandFailedDueToCooldown = true;
                     }
@@ -838,15 +913,17 @@ function parseAndExecuteCommand(room, command, socket) {
                             });
 
                             io.to(room.roomCode).emit('gameOver', { winner, board: room.board, players: room.players });
-                            break; // Break inner loop
+                            return; // Exit function after game over
                         }
 
                         io.to(room.roomCode).emit('moveMade', { move: { startRow, startCol, endRow, endCol }, board: room.board });
                         commandExecuted = true;
-                        pieceHandledThisTurn = true;
-                        if (!actionAppendToQueue) {
-                            break;
-                        }
+
+                        // Update piece's current position for subsequent actions in the same command
+                        startRow = endRow;
+                        startCol = endCol;
+                        pieceKey = newPieceKey;
+
                     } else {
                         commandFailedDueToInvalidMove = true;
                     }
